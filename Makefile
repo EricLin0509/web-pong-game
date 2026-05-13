@@ -1,5 +1,5 @@
 CC=clang
-CFLAGS=-Wall -Wextra -Werror -lSDL3
+CFLAGS=-Wall -Wextra -Werror -lSDL3 -lSDL3_ttf
 OUT=pong
 SRC=main.c
 

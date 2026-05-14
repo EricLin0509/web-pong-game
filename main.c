@@ -205,7 +205,7 @@ static CollisionType ball_collision(Ball *ball, Paddle *left_paddle, Paddle *rig
         return COLLISION_RIGHT;
     }
 
-    if (ball->rect.y < 0 || ball->rect.y > WINDOW_HEIGHT - BALL_SIZE)
+    if (ball->rect.y + ball->speed_y < 0 || ball->rect.y + ball->speed_y > WINDOW_HEIGHT - BALL_SIZE)
         ball->speed_y *= -1;
 
     Paddle *chosen_paddle = (ball->rect.x < WINDOW_WIDTH / 2) ? left_paddle : right_paddle;
@@ -213,6 +213,10 @@ static CollisionType ball_collision(Ball *ball, Paddle *left_paddle, Paddle *rig
     if (SDL_HasRectIntersectionFloat(&(ball->rect), &(chosen_paddle->paddle_rect)))
     {
         ball->speed_x = (ball->speed_x + JITTER) * -1;
+        if (ball->speed_x > 0)
+            ball->rect.x =chosen_paddle->paddle_rect.x + chosen_paddle->paddle_rect.w;
+        else
+            ball->rect.x =chosen_paddle->paddle_rect.x - BALL_SIZE;
         speed_up_ball(ball);
     }
 

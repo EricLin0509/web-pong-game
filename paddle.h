@@ -4,8 +4,9 @@
 #include <stdbool.h>
 #include <SDL3/SDL_main.h>
 
-#define PADDLE_WIDTH 10
-#define PADDLE_HEIGHT 100
+#define PADDLE_WIDTH 15
+#define PADDLE_HEIGHT 110
+#define PADDLE_PADDING 20
 #define PADDLE_SPEED 12
 
 /* The movement direction of the paddle */

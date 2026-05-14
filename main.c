@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdbool.h>
+
+#define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL.h>
 
@@ -21,8 +23,7 @@ typedef enum {
     GAME_INIT,
     GAME_RUNNING,
     GAME_PAUSED,
-    GAME_OVER,
-    GAME_QUIT
+    GAME_OVER
 } GameState;
 
 typedef struct {
@@ -51,6 +52,8 @@ typedef struct {
 
     GameState state;
 } Game;
+
+static Game game = {0};
 
 /* ====== Text Functions ====== */
 
@@ -235,59 +238,6 @@ static void render_ball(Ball *ball, SDL_Renderer *renderer)
 
 /*====== Game Logics ======*/
 
-static bool game_init(Game *game)
-{
-    if (game == NULL) return false;
-
-    SDL_Init(SDL_INIT_VIDEO);
-
-    if (!TTF_Init())
-    {
-        fprintf(stderr, ERROR_TEXT " Failed to initialize TTF: %s\n", SDL_GetError());
-        return false;
-    }
-
-    /* Initialize window and renderer */
-    game->window = SDL_CreateWindow(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
-    if (game->window == NULL)
-    {
-        fprintf(stderr, ERROR_TEXT " Failed to create window: %s\n", SDL_GetError());
-        return false;
-    }
-
-    game->window_renderer = SDL_CreateRenderer(game->window, NULL);
-    if (game->window_renderer == NULL)
-    {
-        fprintf(stderr, ERROR_TEXT " Failed to create renderer: %s\n", SDL_GetError());
-        return false;
-    }
-
-    /* Initialize middle line */
-    game->middle_line.x = (WINDOW_WIDTH - LINE_WIDTH) / 2;
-    game->middle_line.y = 0;
-    game->middle_line.w = LINE_WIDTH;
-    game->middle_line.h = WINDOW_HEIGHT;
-
-    /* Load font */
-    create_text_texture(&game->welcome_text, FONT_PATH, "Welcome to Pong", FONT_SIZE, game->window_renderer, FONT_COLOR);
-    create_text_texture(&game->welcome_description, FONT_PATH, "Press [space] to start", FONT_SIZE - 32, game->window_renderer, FONT_COLOR);
-
-    create_text_texture(&game->paused_text, FONT_PATH, "Paused", FONT_SIZE, game->window_renderer, FONT_COLOR);
-
-    create_text_texture(&game->game_over_text, FONT_PATH, "WIN", FONT_SIZE, game->window_renderer, FONT_COLOR);
-    create_text_texture(&game->game_over_description, FONT_PATH, "Press [space] to restart", FONT_SIZE - 36, game->window_renderer, FONT_COLOR);
-
-    /* Initialize paddles */
-    paddle_init(&game->left_paddle, PADDLE_PADDING, (WINDOW_HEIGHT - PADDLE_HEIGHT) / 2, PADDLE_WIDTH, PADDLE_HEIGHT);
-    paddle_init(&game->right_paddle, WINDOW_WIDTH - PADDLE_WIDTH - PADDLE_PADDING, (WINDOW_HEIGHT - PADDLE_HEIGHT) / 2, PADDLE_WIDTH, PADDLE_HEIGHT);
-
-    /* Initialize ball */
-    ball_init(&game->ball, (WINDOW_WIDTH - BALL_SIZE) / 2, (WINDOW_HEIGHT - BALL_SIZE) / 2, BALL_SIZE, BALL_SIZE);
-
-    game->state = GAME_INIT;
-    return true;
-}
-
 static void game_reset(Game *game)
 {
     if (game == NULL) return;
@@ -349,7 +299,6 @@ static void handle_space_key(Game *game)
             game_reset(game);
             game->state = GAME_RUNNING;
             break;
-        case GAME_QUIT:
         default:
             break;
     }
@@ -389,30 +338,6 @@ static void handle_key_down(Game *game, SDL_KeyboardEvent key)
 
         default:
             break;
-    }
-}
-
-static void handle_events(Game *game)
-{
-    if (game == NULL) return;
-
-    SDL_Event event;
-    while(SDL_PollEvent(&event))
-    {
-        switch (event.type)
-        {
-            case SDL_EVENT_QUIT:
-                game->state = GAME_QUIT;
-                break;
-            case SDL_EVENT_KEY_DOWN:
-                handle_key_down(game, event.key);
-                break;
-            case SDL_EVENT_KEY_UP:
-                handle_key_up(game, event.key);
-                break;
-            default:
-                break;
-        }
     }
 }
 
@@ -499,15 +424,16 @@ static void render(Game *game)
             break;
         case GAME_OVER:
             show_middle_line(game);
+            show_game_screen(game);
             show_game_over_screen(game);
             break;
-        case GAME_QUIT:
         default:
             break;
     }
     SDL_SetRenderDrawColor(game->window_renderer, 0, 0, 0, 255);
 
     SDL_RenderPresent(game->window_renderer);
+    SDL_Delay(16); // Limit the frame rate to 60 FPS
 }
 
 static void score_points(Game *game, bool is_left_score)
@@ -523,83 +449,119 @@ static void score_points(Game *game, bool is_left_score)
         game->max_score = *score;
 }
 
-static void game_run(Game *game)
+SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
-    if (game->state != GAME_RUNNING)
+    SDL_Init(SDL_INIT_VIDEO);
+
+    if (!TTF_Init())
     {
-        SDL_Delay(16); // Don't waste CPU cycles if the game is not running
-        return;
+        fprintf(stderr, ERROR_TEXT " Failed to initialize TTF: %s\n", SDL_GetError());
+        return SDL_APP_FAILURE;
     }
 
-    paddle_move(&game->left_paddle);
-    paddle_move(&game->right_paddle);
+    /* Initialize window and renderer */
+    game.window = SDL_CreateWindow(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+    if (game.window == NULL)
+    {
+        fprintf(stderr, ERROR_TEXT " Failed to create window: %s\n", SDL_GetError());
+        return SDL_APP_FAILURE;
+    }
 
-    CollisionType collision = ball_collision(&game->ball, &game->left_paddle, &game->right_paddle);
+    game.window_renderer = SDL_CreateRenderer(game.window, NULL);
+    if (game.window_renderer == NULL)
+    {
+        fprintf(stderr, ERROR_TEXT " Failed to create renderer: %s\n", SDL_GetError());
+        return SDL_APP_FAILURE;
+    }
+
+    /* Initialize middle line */
+    game.middle_line.x = (WINDOW_WIDTH - LINE_WIDTH) / 2;
+    game.middle_line.y = 0;
+    game.middle_line.w = LINE_WIDTH;
+    game.middle_line.h = WINDOW_HEIGHT;
+
+    /* Load font */
+    create_text_texture(&game.welcome_text, FONT_PATH, "Welcome to Pong", FONT_SIZE, game.window_renderer, FONT_COLOR);
+    create_text_texture(&game.welcome_description, FONT_PATH, "Press [space] to start", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
+
+    create_text_texture(&game.paused_text, FONT_PATH, "Paused", FONT_SIZE, game.window_renderer, FONT_COLOR);
+
+    create_text_texture(&game.game_over_text, FONT_PATH, "WIN", FONT_SIZE, game.window_renderer, FONT_COLOR);
+    create_text_texture(&game.game_over_description, FONT_PATH, "Press [space] to restart", FONT_SIZE - 36, game.window_renderer, FONT_COLOR);
+
+    /* Initialize paddles */
+    paddle_init(&game.left_paddle, PADDLE_PADDING, (WINDOW_HEIGHT - PADDLE_HEIGHT) / 2, PADDLE_WIDTH, PADDLE_HEIGHT);
+    paddle_init(&game.right_paddle, WINDOW_WIDTH - PADDLE_WIDTH - PADDLE_PADDING, (WINDOW_HEIGHT - PADDLE_HEIGHT) / 2, PADDLE_WIDTH, PADDLE_HEIGHT);
+
+    /* Initialize ball */
+    ball_init(&game.ball, (WINDOW_WIDTH - BALL_SIZE) / 2, (WINDOW_HEIGHT - BALL_SIZE) / 2, BALL_SIZE, BALL_SIZE);
+
+    game.state = GAME_INIT;
+    return SDL_APP_CONTINUE;
+}
+
+SDL_AppResult SDL_AppIterate(void *appstate)
+{
+    render(&game);
+
+    if (game.state != GAME_RUNNING)
+        return SDL_APP_CONTINUE;
+
+    paddle_move(&game.left_paddle);
+    paddle_move(&game.right_paddle);
+
+    CollisionType collision = ball_collision(&game.ball, &game.left_paddle, &game.right_paddle);
     switch (collision)
     {
         case COLLISION_LEFT:
-            score_points(game, false);
+            score_points(&game, false);
             break;
         case COLLISION_RIGHT:
-            score_points(game, true);
+            score_points(&game, true);
             break;
         case COLLISION_NONE:
         default:
             break;
     }    
 
-    if (game->max_score == MAX_SCORE_POINTS)
-        game->state = GAME_OVER;
+    if (game.max_score == MAX_SCORE_POINTS)
+        game.state = GAME_OVER;
+
+    return SDL_APP_CONTINUE;
 }
 
-static void game_loop(Game *game)
+SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
-    if (game == NULL) return;
-
-    while (game->state != GAME_QUIT)
+    switch (event->type)
     {
-        handle_events(game);
-
-        game_run(game);
-
-        render(game);
-
-        SDL_Delay(16);
+        case SDL_EVENT_QUIT:
+            return SDL_APP_SUCCESS;
+        case SDL_EVENT_KEY_DOWN:
+            handle_key_down(&game, event->key);
+            break;
+        case SDL_EVENT_KEY_UP:
+            handle_key_up(&game, event->key);
+            break;
+        default:
+            break;
     }
+
+    return SDL_APP_CONTINUE;
 }
 
-static void game_quit(Game *game)
+void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
-    if (game == NULL) return;
-
     fprintf(stdout, INFO_TEXT "Quitting...\n");
 
-    if (game->window_renderer)
-        SDL_DestroyRenderer(game->window_renderer);
+    if (game.window_renderer)
+        SDL_DestroyRenderer(game.window_renderer);
 
-    if (game->window)
-        SDL_DestroyWindow(game->window);
+    if (game.window)
+        SDL_DestroyWindow(game.window);
 
-    destroy_text_texture(&game->welcome_text);
-    destroy_text_texture(&game->welcome_description);
-    destroy_text_texture(&game->paused_text);
-    destroy_text_texture(&game->game_over_text);
-    destroy_text_texture(&game->game_over_description);
-    
-    SDL_Quit();
-}
-
-int main(void) {
-    Game game = {0};
-
-    srand(time(NULL)); // Seed the random number generator
-
-    if (!game_init(&game))
-        return 1;
-
-    game_loop(&game);
-
-    game_quit(&game);
-
-    return 0;
+    destroy_text_texture(&game.welcome_text);
+    destroy_text_texture(&game.welcome_description);
+    destroy_text_texture(&game.paused_text);
+    destroy_text_texture(&game.game_over_text);
+    destroy_text_texture(&game.game_over_description);
 }

@@ -14,6 +14,7 @@
 
 #define WINDOW_WIDTH 900
 #define WINDOW_HEIGHT 650
+#define WINDOW_BORDER_OFFSET 10
 #define WINDOW_TITLE "Pong"
 #define LINE_WIDTH 2
 
@@ -28,6 +29,7 @@ typedef enum {
 
 typedef struct {
     SDL_Window *window;
+    SDL_FRect window_boarder;
     SDL_Renderer *window_renderer;
     SDL_FRect middle_line;
 
@@ -129,11 +131,11 @@ static void paddle_move(Paddle *paddle)
     switch (paddle->direction)
     {
         case PADDLE_UP:
-            if (paddle->paddle_rect.y > 0)
+            if (paddle->paddle_rect.y - PADDLE_SPEED > WINDOW_BORDER_OFFSET)
                 paddle->paddle_rect.y -= PADDLE_SPEED;
             break;
         case PADDLE_DOWN:
-            if (paddle->paddle_rect.y < WINDOW_HEIGHT - PADDLE_HEIGHT)
+            if (paddle->paddle_rect.y + PADDLE_SPEED < WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - PADDLE_HEIGHT)
                 paddle->paddle_rect.y += PADDLE_SPEED;
             break;
         case PADDLE_STOP:
@@ -199,18 +201,18 @@ static CollisionType ball_collision(Ball *ball, Paddle *left_paddle, Paddle *rig
 {
     if (ball == NULL || left_paddle == NULL || right_paddle == NULL) return COLLISION_NONE;
 
-    if (ball->rect.x < 0)
+    if (ball->rect.x < WINDOW_BORDER_OFFSET)
     {
         reset_ball(ball, true);
         return COLLISION_LEFT;
     }
-    else if (ball->rect.x > WINDOW_WIDTH - BALL_SIZE)
+    else if (ball->rect.x > WINDOW_WIDTH - WINDOW_BORDER_OFFSET - BALL_SIZE)
     {
         reset_ball(ball, false);
         return COLLISION_RIGHT;
     }
 
-    if (ball->rect.y + ball->speed_y < 0 || ball->rect.y + ball->speed_y > WINDOW_HEIGHT - BALL_SIZE)
+    if (ball->rect.y + ball->speed_y < WINDOW_BORDER_OFFSET || ball->rect.y + ball->speed_y > WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - BALL_SIZE)
         ball->speed_y *= -1;
 
     Paddle *chosen_paddle = (ball->rect.x < WINDOW_WIDTH / 2) ? left_paddle : right_paddle;
@@ -412,6 +414,7 @@ static void render(Game *game)
     SDL_RenderClear(game->window_renderer);
 
     SDL_SetRenderDrawColor(game->window_renderer, 255, 255, 255, 255);
+    SDL_RenderRect(game->window_renderer, &(game->window_boarder));
 
     switch (game->state)
     {
@@ -463,6 +466,21 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
+    /* Initialize boarder and middle line */
+    game.window_boarder = (SDL_FRect){
+        WINDOW_BORDER_OFFSET,
+        WINDOW_BORDER_OFFSET,
+        WINDOW_WIDTH - 2 * WINDOW_BORDER_OFFSET,
+        WINDOW_HEIGHT - 2 * WINDOW_BORDER_OFFSET,
+    };
+
+    game.middle_line = (SDL_FRect) {
+        (WINDOW_WIDTH - LINE_WIDTH) / 2,
+        WINDOW_BORDER_OFFSET,
+        LINE_WIDTH,
+        WINDOW_HEIGHT - 2 * WINDOW_BORDER_OFFSET
+    };
+
     /* Initialize window and renderer */
     game.window = SDL_CreateWindow(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
     if (game.window == NULL)
@@ -483,13 +501,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         fprintf(stderr, ERROR_TEXT " Failed to set logical presentation: %s\n", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-    
-
-    /* Initialize middle line */
-    game.middle_line.x = (WINDOW_WIDTH - LINE_WIDTH) / 2;
-    game.middle_line.y = 0;
-    game.middle_line.w = LINE_WIDTH;
-    game.middle_line.h = WINDOW_HEIGHT;
 
     /* Load font */
     bool font_loaded = true;

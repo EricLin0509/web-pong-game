@@ -57,14 +57,14 @@ static Game game = {0};
 
 /* ====== Text Functions ====== */
 
-static void create_text_texture(Text *text, const char *font_path, const char *str, int font_size,
+static bool create_text_texture(Text *text, const char *font_path, const char *str, int font_size,
                                                                     SDL_Renderer *renderer, SDL_Color color)
 {
     TTF_Font *font = TTF_OpenFont(font_path, font_size);
     if (font == NULL)
     {
         fprintf(stderr, ERROR_TEXT " Failed to load font: %s\n", SDL_GetError());
-        return;
+        return false;
     }
 
     SDL_Surface *surface = TTF_RenderText_Blended(font, str, 0, color);
@@ -73,7 +73,7 @@ static void create_text_texture(Text *text, const char *font_path, const char *s
     if (surface == NULL)
     {
         fprintf(stderr, ERROR_TEXT " Failed to render text: %s\n", SDL_GetError());
-        return;
+        return false;
     }
 
     text->text_rect.w = surface->w;
@@ -85,8 +85,10 @@ static void create_text_texture(Text *text, const char *font_path, const char *s
     if (text->text_texture == NULL)
     {
         fprintf(stderr, ERROR_TEXT " Failed to create texture: %s\n", SDL_GetError());
-        return;
+        return false;
     }
+
+    return true;
 }
 
 static void render_text_texture(Text *text, SDL_Renderer *renderer, float x, float y)
@@ -451,6 +453,8 @@ static void score_points(Game *game, bool is_left_score)
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
+    srand(time(NULL));
+
     SDL_Init(SDL_INIT_VIDEO);
 
     if (!TTF_Init())
@@ -481,13 +485,18 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     game.middle_line.h = WINDOW_HEIGHT;
 
     /* Load font */
-    create_text_texture(&game.welcome_text, FONT_PATH, "Welcome to Pong", FONT_SIZE, game.window_renderer, FONT_COLOR);
-    create_text_texture(&game.welcome_description, FONT_PATH, "Press [space] to start", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
+    bool font_loaded = true;
 
-    create_text_texture(&game.paused_text, FONT_PATH, "Paused", FONT_SIZE, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(&game.welcome_text, FONT_PATH, "Welcome to Pong", FONT_SIZE, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(&game.welcome_description, FONT_PATH, "Press [space] to start", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
 
-    create_text_texture(&game.game_over_text, FONT_PATH, "WIN", FONT_SIZE, game.window_renderer, FONT_COLOR);
-    create_text_texture(&game.game_over_description, FONT_PATH, "Press [space] to restart", FONT_SIZE - 36, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(&game.paused_text, FONT_PATH, "Paused", FONT_SIZE, game.window_renderer, FONT_COLOR);
+
+    font_loaded &= create_text_texture(&game.game_over_text, FONT_PATH, "WIN", FONT_SIZE, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(&game.game_over_description, FONT_PATH, "Press [space] to restart", FONT_SIZE - 36, game.window_renderer, FONT_COLOR);
+
+    if (!font_loaded)
+        return SDL_APP_FAILURE;
 
     /* Initialize paddles */
     paddle_init(&game.left_paddle, PADDLE_PADDING, (WINDOW_HEIGHT - PADDLE_HEIGHT) / 2, PADDLE_WIDTH, PADDLE_HEIGHT);
@@ -551,7 +560,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
-    fprintf(stdout, INFO_TEXT "Quitting...\n");
+    fprintf(stdout, INFO_TEXT " Quitting...\n");
 
     if (game.window_renderer)
         SDL_DestroyRenderer(game.window_renderer);

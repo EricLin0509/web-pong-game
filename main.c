@@ -464,7 +464,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     }
 
     /* Initialize window and renderer */
-    game.window = SDL_CreateWindow(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+    game.window = SDL_CreateWindow(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
     if (game.window == NULL)
     {
         fprintf(stderr, ERROR_TEXT " Failed to create window: %s\n", SDL_GetError());
@@ -477,6 +477,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         fprintf(stderr, ERROR_TEXT " Failed to create renderer: %s\n", SDL_GetError());
         return SDL_APP_FAILURE;
     }
+
+    if (!SDL_SetRenderLogicalPresentation(game.window_renderer, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX))
+    {
+        fprintf(stderr, ERROR_TEXT " Failed to set logical presentation: %s\n", SDL_GetError());
+        return SDL_APP_FAILURE;
+    }
+    
 
     /* Initialize middle line */
     game.middle_line.x = (WINDOW_WIDTH - LINE_WIDTH) / 2;

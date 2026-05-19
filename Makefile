@@ -1,30 +1,18 @@
-CC=clang
-CC_WASM=emcc
-CFLAGS=-Wall -Werror
-EXE_CFLAGS= -lSDL3 -lSDL3_ttf
-WASM_CFLAGS= -Wno-experimental -sUSE_SDL=3 -sUSE_SDL_TTF=3 -sUSE_FREETYPE=1
-OUT=pong
-SRC=main.c
+GAMEDIR=game
+MODULES=pong.wasm pong.js pong.data
+VUE_WASM_DIR=web-pong-game/src/wasm
 
-all: release
+all: build_game copy_files
 
-wasm: $(SRC)
-	$(CC_WASM) $(CFLAGS) $(WASM_CFLAGS) -O3 \
-	-sENVIRONMENT=web \
-	-sEXPORTED_RUNTIME_METHODS="['ccall', 'cwrap', 'setCanvasSize']" \
-	--preload-file roboto.ttf \
-	--shell-file shell.html \
-	$^ -o $(OUT).html
+build_game:
+	make -C $(GAMEDIR) wasm
 
-release: $(SRC)
-	$(CC) $(CFLAGS) $(EXE_CFLAGS) -O3 $^ -o $(OUT)
-
-debug: $(SRC)
-	$(CC) $(CFLAGS) $(EXE_CFLAGS) -g $^ -o $(OUT)
-
-run: debug
-	./$(OUT)
+copy_files:
+	mkdir -p $(VUE_WASM_DIR)
+	for file in $(MODULES); do \
+		cp $(GAMEDIR)/$$file $(VUE_WASM_DIR)/$$file; \
+	done
 
 clean:
-	rm -f $(OUT)*
-
+	make -C $(GAMEDIR) clean
+	rm -rf $(VUE_WASM_DIR)/*

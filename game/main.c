@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stddef.h>
+#include <assert.h>
 #include <time.h>
 #include <stdbool.h>
 
@@ -15,12 +17,16 @@
 #include "text.h"
 #include "paddle.h"
 #include "ball.h"
+#include "themes.h"
 
 #define WINDOW_WIDTH 900
 #define WINDOW_HEIGHT 650
 #define WINDOW_BORDER_OFFSET 10
 #define WINDOW_TITLE "Pong"
 #define LINE_WIDTH 2
+
+#define TOTAL_TEXT (offsetof(Game, game_over_description) \
+    - offsetof(Game, welcome_text)) / sizeof(Text) + 1
 
 #define MAX_SCORE_POINTS 11
 
@@ -57,11 +63,48 @@ typedef struct {
     size_t right_score;
 
     GameState state;
+    Theme const *theme;
 } Game;
+
+/* Make sure the Text fields are continuous */
+static_assert(offsetof(Game, welcome_description) == offsetof(Game, welcome_text) + sizeof(Text),
+              "Text members are not contiguous: welcome_text -> welcome_description");
+static_assert(offsetof(Game, paused_text) == offsetof(Game, welcome_description) + sizeof(Text),
+              "Text members are not contiguous: welcome_description -> paused_text");
+static_assert(offsetof(Game, game_over_text) == offsetof(Game, paused_text) + sizeof(Text),
+              "Text members are not contiguous: paused_text -> game_over_text");
+static_assert(offsetof(Game, game_over_description) == offsetof(Game, game_over_text) + sizeof(Text),
+              "Text members are not contiguous: game_over_text -> game_over_description");
 
 #ifdef __EMSCRIPTEN__
 Game *game_ptr = NULL; // Expose the game struct to WebAssembly
 #endif
+
+/* ===== Theme Functions ====== */
+
+static void set_theme(Game *game)
+{
+    if (game == NULL) return;
+
+    int theme_index = rand() % THEME_COUNT;
+
+    game->theme = themes + theme_index;
+
+    /* Due to the Text fields are continuous, we can set the color of all Text fields at once */
+    Text *text_region = &game->welcome_text;
+    for (int i = 0; text_region <= &game->game_over_description && i < TOTAL_TEXT; i++)
+    {
+        bool is_colored = SDL_SetTextureColorMod(text_region->text_texture,
+            game->theme->foreground[0],
+            game->theme->foreground[1],
+            game->theme->foreground[2]
+        );
+
+        if (!is_colored)
+            fprintf(stderr, WARNING_TEXT " Failed to set color of text texture: %s\n", SDL_GetError());
+        text_region++;
+    }
+}
 
 /* ====== Text Functions ====== */
 
@@ -329,6 +372,10 @@ static void handle_key_down(Game *game, SDL_KeyboardEvent key)
         case SDL_SCANCODE_SPACE:
             handle_space_key(game);
             break;
+        /* Change the theme */
+        case SDL_SCANCODE_C:
+            set_theme(game);
+            break;
 
         /* Right player paddle */
         case SDL_SCANCODE_I:
@@ -419,7 +466,12 @@ static void render(Game *game)
 {
     SDL_RenderClear(game->window_renderer);
 
-    SDL_SetRenderDrawColor(game->window_renderer, 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(game->window_renderer,
+        game->theme->foreground[0],
+        game->theme->foreground[1],
+        game->theme->foreground[2],
+        255);
+
     SDL_RenderRect(game->window_renderer, &(game->window_boarder));
 
     switch (game->state)
@@ -441,7 +493,11 @@ static void render(Game *game)
         default:
             break;
     }
-    SDL_SetRenderDrawColor(game->window_renderer, 0, 0, 0, 255);
+    SDL_SetRenderDrawColor(game->window_renderer,
+        game->theme->background[0],
+        game->theme->background[1],
+        game->theme->background[2],
+        255);
 
     SDL_RenderPresent(game->window_renderer);
     SDL_Delay(16); // Limit the frame rate to 60 FPS
@@ -535,6 +591,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     /* Initialize ball */
     ball_init(&game.ball, (WINDOW_WIDTH - BALL_SIZE) / 2, (WINDOW_HEIGHT - BALL_SIZE) / 2, BALL_SIZE, BALL_SIZE);
+
+    /* Initialize theme */
+    set_theme(&game);
 
     game.state = GAME_INIT;
     return SDL_APP_CONTINUE;

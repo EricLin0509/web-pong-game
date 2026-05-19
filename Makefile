@@ -1,6 +1,7 @@
 GAMEDIR=game
 MODULES=pong.wasm pong.js pong.data
-VUE_WASM_DIR=web-pong-game/src/wasm
+VUE_DIR=web-pong-game
+VUE_WASM_DIR=$(VUE_DIR)/public/wasm
 
 all: build_game copy_files
 
@@ -12,6 +13,9 @@ copy_files:
 	for file in $(MODULES); do \
 		cp $(GAMEDIR)/$$file $(VUE_WASM_DIR)/$$file; \
 	done
+
+run_server:
+	make -C $(VUE_DIR) run
 
 clean:
 	make -C $(GAMEDIR) clean

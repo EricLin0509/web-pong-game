@@ -3,6 +3,9 @@ export function loadWasm(canvas) {
     window.Module = {
       canvas: canvas,
       onRuntimeInitialized: () => {
+        const module = window.Module;
+        module._pause_game = module.cwrap('pause_game', null, []);
+
         console.log('☑️ Pong Module is set!');
         resolve(window.Module);
       },

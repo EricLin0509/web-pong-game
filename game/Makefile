@@ -12,6 +12,7 @@ wasm: $(SRC)
 	$(CC_WASM) $(CFLAGS) $(WASM_CFLAGS) -O3 \
 	-sENVIRONMENT=web \
 	-sEXPORTED_RUNTIME_METHODS="['ccall', 'cwrap', 'setCanvasSize']" \
+	-sEXPORTED_FUNCTIONS="['_main', '_pause_game']" \
 	--preload-file roboto.ttf \
 	--shell-file shell.html \
 	$^ -o $(OUT).html

@@ -5,10 +5,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { loadWasm } from '../composables/useWasm.js'
 
 const canvasRef = ref(null)
+let pongModule = null
+
+function handleVisibilityChange() { // pause game when tab is not active
+  if (document.hidden && pongModule) {
+    pongModule._pause_game()
+  }
+}
 
 onMounted(async () => {
   if (!canvasRef.value) {
@@ -16,8 +23,15 @@ onMounted(async () => {
     return
   }
   canvasRef.value.focus()
-  await loadWasm(canvasRef.value)
+  pongModule = await loadWasm(canvasRef.value)
+
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+})
+
 </script>
 
 <style scoped>

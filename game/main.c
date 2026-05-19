@@ -6,6 +6,10 @@
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #include "ansi-color.h"
 
 #include "text.h"
@@ -55,7 +59,9 @@ typedef struct {
     GameState state;
 } Game;
 
-static Game game = {0};
+#ifdef __EMSCRIPTEN__
+Game *game_ptr = NULL; // Expose the game struct to WebAssembly
+#endif
 
 /* ====== Text Functions ====== */
 
@@ -458,6 +464,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
     srand(time(NULL));
 
+    static Game game = {0}; // Use static variable to keep the memory allocation in program lifetime
+    *appstate = &game;
+
+#ifdef __EMSCRIPTEN__
+    game_ptr = *appstate; // Expose the game struct to WebAssembly
+#endif
+
     SDL_Init(SDL_INIT_VIDEO);
 
     if (!TTF_Init())
@@ -529,45 +542,49 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
-    render(&game);
+    Game *game = (Game *)appstate;
 
-    if (game.state != GAME_RUNNING)
+    render(game);
+
+    if (game->state != GAME_RUNNING)
         return SDL_APP_CONTINUE;
 
-    paddle_move(&game.left_paddle);
-    paddle_move(&game.right_paddle);
+    paddle_move(&game->left_paddle);
+    paddle_move(&game->right_paddle);
 
-    CollisionType collision = ball_collision(&game.ball, &game.left_paddle, &game.right_paddle);
+    CollisionType collision = ball_collision(&game->ball, &game->left_paddle, &game->right_paddle);
     switch (collision)
     {
         case COLLISION_LEFT:
-            score_points(&game, false);
+            score_points(game, false);
             break;
         case COLLISION_RIGHT:
-            score_points(&game, true);
+            score_points(game, true);
             break;
         case COLLISION_NONE:
         default:
             break;
     }    
 
-    if (game.max_score == MAX_SCORE_POINTS)
-        game.state = GAME_OVER;
+    if (game->max_score == MAX_SCORE_POINTS)
+        game->state = GAME_OVER;
 
     return SDL_APP_CONTINUE;
 }
 
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
+    Game *game = (Game *)appstate;
+
     switch (event->type)
     {
         case SDL_EVENT_QUIT:
             return SDL_APP_SUCCESS;
         case SDL_EVENT_KEY_DOWN:
-            handle_key_down(&game, event->key);
+            handle_key_down(game, event->key);
             break;
         case SDL_EVENT_KEY_UP:
-            handle_key_up(&game, event->key);
+            handle_key_up(game, event->key);
             break;
         default:
             break;
@@ -578,17 +595,32 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
+    Game *game = (Game *)appstate;
+
     fprintf(stdout, INFO_TEXT " Quitting...\n");
 
-    if (game.window_renderer)
-        SDL_DestroyRenderer(game.window_renderer);
+    if (game->window_renderer)
+        SDL_DestroyRenderer(game->window_renderer);
 
-    if (game.window)
-        SDL_DestroyWindow(game.window);
+    if (game->window)
+        SDL_DestroyWindow(game->window);
 
-    destroy_text_texture(&game.welcome_text);
-    destroy_text_texture(&game.welcome_description);
-    destroy_text_texture(&game.paused_text);
-    destroy_text_texture(&game.game_over_text);
-    destroy_text_texture(&game.game_over_description);
+    destroy_text_texture(&game->welcome_text);
+    destroy_text_texture(&game->welcome_description);
+    destroy_text_texture(&game->paused_text);
+    destroy_text_texture(&game->game_over_text);
+    destroy_text_texture(&game->game_over_description);
 }
+
+/* Emscripten bindings */
+
+#ifdef __EMSCRIPTEN__
+
+void pause_game(void)
+{
+    if (game_ptr == NULL) return;
+
+    game_ptr->state = GAME_PAUSED;
+}
+
+#endif // __EMSCRIPTEN__

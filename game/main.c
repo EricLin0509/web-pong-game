@@ -1,6 +1,4 @@
 #include <stdio.h>
-#include <stddef.h>
-#include <assert.h>
 #include <time.h>
 #include <stdbool.h>
 
@@ -13,11 +11,7 @@
 #endif
 
 #include "ansi-color.h"
-
-#include "text.h"
-#include "paddle.h"
-#include "ball.h"
-#include "themes.h"
+#include "game.h"
 
 #define WINDOW_WIDTH 900
 #define WINDOW_HEIGHT 650
@@ -25,59 +19,13 @@
 #define WINDOW_TITLE "Pong"
 #define LINE_WIDTH 2
 
-#define TOTAL_TEXT (offsetof(Game, game_over_description) \
-    - offsetof(Game, welcome_text)) / sizeof(Text) + 1
-
 #define MAX_SCORE_POINTS 11
-
-typedef enum {
-    GAME_INIT,
-    GAME_RUNNING,
-    GAME_PAUSED,
-    GAME_OVER
-} GameState;
-
-typedef struct {
-    SDL_Window *window;
-    SDL_FRect window_boarder;
-    SDL_Renderer *window_renderer;
-    SDL_FRect middle_line;
-
-    Paddle left_paddle;
-    Paddle right_paddle;
-
-    Ball ball;
-
-    Text welcome_text;
-    Text welcome_description;
-
-    Text paused_text;
-
-    Text game_over_text;
-    Text game_over_description;
-
-    size_t rounds;
-    size_t max_score;
-
-    size_t left_score;
-    size_t right_score;
-
-    GameState state;
-    Theme const *theme;
-} Game;
-
-/* Make sure the Text fields are continuous */
-static_assert(offsetof(Game, welcome_description) == offsetof(Game, welcome_text) + sizeof(Text),
-              "Text members are not contiguous: welcome_text -> welcome_description");
-static_assert(offsetof(Game, paused_text) == offsetof(Game, welcome_description) + sizeof(Text),
-              "Text members are not contiguous: welcome_description -> paused_text");
-static_assert(offsetof(Game, game_over_text) == offsetof(Game, paused_text) + sizeof(Text),
-              "Text members are not contiguous: paused_text -> game_over_text");
-static_assert(offsetof(Game, game_over_description) == offsetof(Game, game_over_text) + sizeof(Text),
-              "Text members are not contiguous: game_over_text -> game_over_description");
 
 #ifdef __EMSCRIPTEN__
 Game *game_ptr = NULL; // Expose the game struct to WebAssembly
+
+void pause_game(void);
+void notify_score_points(void);
 #endif
 
 /* ===== Theme Functions ====== */
@@ -302,6 +250,10 @@ static void game_reset(Game *game)
     reset_ball(&game->ball, SHOUD_MOVE_REVERSE);
     reset_paddle(&game->left_paddle);
     reset_paddle(&game->right_paddle);
+
+#ifdef __EMSCRIPTEN__
+    notify_score_points();
+#endif
 }
 
 static void handle_key_up(Game *game, SDL_KeyboardEvent key)
@@ -514,6 +466,10 @@ static void score_points(Game *game, bool is_left_score)
 
     if (*score >= game->max_score)
         game->max_score = *score;
+
+#ifdef __EMSCRIPTEN__
+    notify_score_points();
+#endif
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
@@ -551,7 +507,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     };
 
     /* Initialize window and renderer */
+    /* Emscripten no need to set logical presentation */
+#ifdef __EMSCRIPTEN__
+    game.window = SDL_CreateWindow(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+#else
     game.window = SDL_CreateWindow(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
+#endif
+
     if (game.window == NULL)
     {
         fprintf(stderr, ERROR_TEXT " Failed to create window: %s\n", SDL_GetError());
@@ -565,11 +527,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
+#ifndef __EMSCRIPTEN__
     if (!SDL_SetRenderLogicalPresentation(game.window_renderer, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX))
     {
         fprintf(stderr, ERROR_TEXT " Failed to set logical presentation: %s\n", SDL_GetError());
         return SDL_APP_FAILURE;
     }
+#endif
 
     /* Load font */
     bool font_loaded = true;
@@ -594,6 +558,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     /* Initialize theme */
     set_theme(&game);
+
+    /* Notify the initial score */
+#ifdef __EMSCRIPTEN__
+    notify_score_points();
+#endif
 
     game.state = GAME_INIT;
     return SDL_APP_CONTINUE;
@@ -679,7 +648,17 @@ void pause_game(void)
 {
     if (game_ptr == NULL) return;
 
-    game_ptr->state = GAME_PAUSED;
+    if (game_ptr->state == GAME_RUNNING)
+        game_ptr->state = GAME_PAUSED;
+}
+
+void notify_score_points(void)
+{
+    if (game_ptr == NULL) return;
+    EM_ASM ({
+        if (typeof window.updateScore === "function")
+            window.updateScore($0, $1);
+    }, game_ptr->left_score, game_ptr->right_score);
 }
 
 #endif // __EMSCRIPTEN__

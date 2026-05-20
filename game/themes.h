@@ -21,14 +21,14 @@ static const Theme themes[THEME_COUNT] = {
     { {255, 160, 80}, {20, 25, 45} },
     // Dark-green-light-green
     { {180, 230, 160}, {20, 40, 25} },
-    // Dark-pink-light-pink
-    { {255, 200, 200}, {60, 20, 20} },
+    // Dark-violet-champagne-gold
+    { {245, 225, 160}, {35, 20, 50} },
     // Dark-brown-light-gray
     { {245, 235, 210}, {40, 30, 20} },
     // Dark-sea-blue-light-blue
     { {180, 220, 255}, {0, 30, 50} },
-    // Dark-indigo-light-orange
-    { {255, 180, 100}, {20, 20, 60} }
+    // Charcoal-gray-neon-green
+    { {120, 255, 120}, {25, 30, 35} }
 };
 
 #endif // THEMES_H

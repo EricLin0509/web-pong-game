@@ -26,6 +26,7 @@ Game *game_ptr = NULL; // Expose the game struct to WebAssembly
 
 void pause_game(void);
 void notify_score_points(void);
+void is_game_running(void);
 #endif
 
 /* ===== Theme Functions ====== */
@@ -36,7 +37,8 @@ static void set_theme(Game *game)
 
     int theme_index = rand() % THEME_COUNT;
 
-    game->theme = themes + theme_index;
+    game->theme = (game->theme != themes + theme_index) ?
+        themes + theme_index : themes + (theme_index + 1) % THEME_COUNT;
 
     /* Due to the Text fields are continuous, we can set the color of all Text fields at once */
     Text *text_region = &game->welcome_text;
@@ -574,6 +576,10 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     render(game);
 
+#ifdef __EMSCRIPTEN__
+    is_game_running();
+#endif
+
     if (game->state != GAME_RUNNING)
         return SDL_APP_CONTINUE;
 
@@ -659,6 +665,15 @@ void notify_score_points(void)
         if (typeof window.updateScore === "function")
             window.updateScore($0, $1);
     }, game_ptr->left_score, game_ptr->right_score);
+}
+
+void is_game_running(void)
+{
+    if (game_ptr == NULL) return;
+    EM_ASM ({
+        if (typeof window.isGameRunning === "function")
+            window.isGameRunning($0);
+    }, game_ptr->state == GAME_RUNNING || game_ptr->state == GAME_PAUSED);
 }
 
 #endif // __EMSCRIPTEN__

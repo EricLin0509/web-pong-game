@@ -1,9 +1,9 @@
 <template>
   <div class="screen-container">
     <!-- Player 1 score -->
-     <div class="score score-left">{{ leftScore }}</div>
+     <div :class="['score score-left', { show: isGameRunning, flash: flashLeft }]">{{ leftScore }}</div>
     <!-- The canvas frame -->
-    <div class="frame" ref="frameRef">
+    <div :class="['frame', { 'animate-slide-down': isWasmLoaded }]" ref="frameRef">
       <!-- The canvas element -->
       <canvas
         ref="canvasRef"
@@ -13,7 +13,7 @@
       ></canvas>
     </div>
     <!-- Player 2 score -->
-     <div class="score score-right">{{ rightScore }}</div>
+     <div :class="['score score-right', { show: isGameRunning, flash: flashRight }]">{{ rightScore }}</div>
   </div>
 </template>
 
@@ -23,8 +23,15 @@ import { loadWasm } from '../composables/useWasm.js'
 
 const frameRef = ref(null)
 const canvasRef = ref(null)
+
 const leftScore = ref(0)
+const flashLeft = ref(false)
+
 const rightScore = ref(0)
+const flashRight = ref(false)
+
+const isWasmLoaded = ref(false)
+const isGameRunning = ref(false)
 
 let pongModule = null
 
@@ -52,14 +59,33 @@ onMounted(async () => {
   }
   
   window.updateScore = (left, right) => {
+    if (left > leftScore.value) {
+      flashLeft.value = true
+      setTimeout(() => {
+        flashLeft.value = false
+      }, 200)
+    }
+
+    if (right > rightScore.value) {
+      flashRight.value = true
+      setTimeout(() => {
+        flashRight.value = false
+      }, 200)
+    }
+
     leftScore.value = left
     rightScore.value = right
+  }
+
+  window.isGameRunning = (isRunning) => {
+    isGameRunning.value = isRunning
   }
 
   window.addEventListener('resize', updateFrameStyles)
   document.addEventListener('visibilitychange', handleVisibilityChange)
 
   pongModule = await loadWasm(canvasRef.value)
+  isWasmLoaded.value = true
 })
 
 onBeforeUnmount(() => {
@@ -117,4 +143,44 @@ canvas {
   object-fit: contain;
   image-rendering: crisp-edges;
 }
+
+/* Animations */
+
+@keyframes slideDownEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(-60px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scoreFlash {
+  0% { text-shadow: 0 0 0px rgba(255,255,255,0); opacity: 1; }
+  50% { text-shadow: 0 0 20px rgba(255,255,255,0.9); opacity: 0.7; transform: scale(1.1); }
+  100% { text-shadow: 0 0 10px rgba(255,255,255,0.5); opacity: 1; transform: scale(1); }
+}
+
+.score.flash {
+  animation: scoreFlash 0.3s ease-out;
+}
+
+.animate-slide-down {
+  animation: slideDownEnter 0.5s ease-out forwards;
+}
+
+.score,
+.frame {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+}
+
+.score.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 </style>

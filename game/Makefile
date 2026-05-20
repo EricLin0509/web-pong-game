@@ -18,7 +18,7 @@ wasm: $(SRC)
 
 wasm_benchmark: $(SRC)
 	$(CC_WASM) $(CFLAGS) $(WASM_CFLAGS) -O3 \
-	-DBENCHMARK_MODE \
+	-D BENCHMARK_MODE \
 	-sENVIRONMENT=web \
 	-sEXPORTED_RUNTIME_METHODS="['ccall', 'cwrap', 'setCanvasSize']" \
 	-sEXPORTED_FUNCTIONS="['_main', '_pause_game', '_set_snowflake_count']" \

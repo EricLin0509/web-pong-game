@@ -1,7 +1,7 @@
 CC=clang
 CC_WASM=emcc
 CFLAGS=-Wall -Werror
-EXE_CFLAGS= -lSDL3 -lSDL3_ttf
+EXE_CFLAGS= -lm -lSDL3 -lSDL3_ttf
 WASM_CFLAGS= -Wno-experimental -sUSE_SDL=3 -sUSE_SDL_TTF=3 -sUSE_FREETYPE=1
 OUT=pong
 SRC=main.c
@@ -12,9 +12,9 @@ wasm: $(SRC)
 	$(CC_WASM) $(CFLAGS) $(WASM_CFLAGS) -O3 \
 	-sENVIRONMENT=web \
 	-sEXPORTED_RUNTIME_METHODS="['ccall', 'cwrap', 'setCanvasSize']" \
-	-sEXPORTED_FUNCTIONS="['_main', '_pause_game']" \
+	-sEXPORTED_FUNCTIONS="['_main', '_pause_game', '_set_snowflake_count']" \
 	--preload-file roboto.ttf \
-	--shell-file shell.html \
+	--shell-file benchmark.html \
 	$^ -o $(OUT).html
 
 release: $(SRC)

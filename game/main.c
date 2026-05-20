@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <time.h>
+#include <math.h>
 #include <stdbool.h>
 
 #define SDL_MAIN_USE_CALLBACKS 1
@@ -25,8 +26,11 @@
 Game *game_ptr = NULL; // Expose the game struct to WebAssembly
 
 void pause_game(void);
+void set_snowflake_count(int count);
 void notify_score_points(void);
 void is_game_running(void);
+void report_wasm_frame(void);
+void notify_snow_count_change(void);
 #endif
 
 /* ===== Theme Functions ====== */
@@ -54,6 +58,137 @@ static void set_theme(Game *game)
             fprintf(stderr, WARNING_TEXT " Failed to set color of text texture: %s\n", SDL_GetError());
         text_region++;
     }
+}
+
+/* ===== Snow Functions ====== */
+
+static void init_snowflake(Snowflake *snowflake)
+{
+    if (snowflake == NULL) return;
+
+        /* Randomly position */
+        snowflake->x = (float)(rand() % WINDOW_WIDTH);
+        snowflake->y = (float)(rand() % WINDOW_HEIGHT);
+
+        /* Randomly speed, size, opacity */
+        snowflake->speed = 0.5f + (rand() % 100) / 100.0f; // 0.5~1.5
+        snowflake->wind = 0.0f;
+        snowflake->size = 1.0f + (rand() % 200) / 100.0f; // 1~3
+        snowflake->opacity = 0.5f + (rand() % 50) / 100.0f; // 0.5~1.0
+}
+
+/* Increment update the snowflake array from start to end */
+static void init_snowflake_inc(Snowflake *snowflake_start_ptr, Snowflake *snowflake_end_ptr)
+{
+    if (snowflake_start_ptr == NULL || snowflake_end_ptr == NULL
+        || snowflake_start_ptr >= snowflake_end_ptr) return;
+
+    Snowflake *update_region = snowflake_start_ptr;
+    while (update_region <= snowflake_end_ptr)
+    {
+        init_snowflake(update_region);
+        update_region++;
+    }
+}
+
+static void increase_snow_count(Snow *snow, int increase)
+{
+    if (snow == NULL || increase == 0) return;
+
+    if (snow->snowflake_count < MAX_SNOWFLAKES && increase > 0)
+    {
+        int old_count = snow->snowflake_count;
+
+        snow->snowflake_count = (snow->snowflake_count + increase) <= MAX_SNOWFLAKES ?
+            snow->snowflake_count + increase : MAX_SNOWFLAKES;
+
+        Snowflake *start = snow->snowflakes + old_count;
+        Snowflake *end = snow->snowflakes + snow->snowflake_count - 1;
+        init_snowflake_inc(start, end);
+    }
+
+    if (snow->snowflake_count > 0 && increase < 0)
+        snow->snowflake_count = (snow->snowflake_count + increase) >= 0 ?
+            snow->snowflake_count + increase : 0;
+
+#ifdef __EMSCRIPTEN__
+    notify_snow_count_change();
+#endif
+}
+
+static void update_snow(Snow *snow, float dt)
+{
+    static float wind_timer = 0;
+    wind_timer += dt;
+    float base_wind = sinf(wind_timer * 0.5f) * 0.3f; // -0.3 ~ 0.3 base wind
+    float wind = base_wind + snow->global_speed; // actual wind speed
+
+    for (int i = 0; i < snow->snowflake_count; i++)
+    {
+        Snowflake *s = &snow->snowflakes[i];
+        // Basic movement
+        s->y += s->speed * 60.0f * dt;
+        s->x += wind * 60.0f * dt;
+        // horizontal jitter
+        s->x += sinf(s->y * 0.1f + i) * 0.2f * dt * 60.0f;
+        // boundary loop: roll out of bottom or top, wrap around
+        if (s->y > WINDOW_HEIGHT + 10)
+        {
+            s->y = -10.0f;
+            s->x = (float)(rand() % WINDOW_WIDTH);
+        }
+        if (s->x < -10) s->x += WINDOW_WIDTH + 20;
+        if (s->x > WINDOW_WIDTH + 10) s->x -= WINDOW_WIDTH + 20;
+    }
+}
+
+static void render_snow(SDL_Renderer *renderer, Snow *snow)
+{
+    int w = WINDOW_WIDTH;
+    int h = WINDOW_HEIGHT;
+    if (!snow->snow_texture)
+        snow->snow_texture = SDL_CreateTexture(renderer,
+            SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, w, h);
+
+    Uint32 *pixels;
+    int pitch;
+    if (!SDL_LockTexture(snow->snow_texture, NULL, (void**)&pixels, &pitch))
+    {
+        fprintf(stderr, "Lock texture failed: %s\n", SDL_GetError());
+        return;
+    }
+
+    memset(pixels, 0, pitch * h);
+    // Draw snowflakes
+    for (int i = 0; i < snow->snowflake_count; i++)
+    {
+        Snowflake *s = &snow->snowflakes[i];
+        int cx = (int)s->x;
+        int cy = (int)s->y;
+        int r = (int)s->size;  // snowflake radius
+        Uint8 alpha = (Uint8)(s->opacity * 255);
+        // Draw simple circle
+        for (int dy = -r; dy <= r; dy++)
+        {
+            for (int dx = -r; dx <= r; dx++)
+            {
+                if (dx*dx + dy*dy <= r*r)
+                {
+                    int px = cx + dx;
+                    int py = cy + dy;
+                    if (px >= 0 && px < w && py >= 0 && py < h)
+                    {
+                        // White snowflake, alpha can be varied
+                        pixels[py * (pitch/4) + px] = (alpha<<24)|(255<<16)|(255<<8)|255;
+                    }
+                }
+            }
+        }
+    }
+
+    SDL_UnlockTexture(snow->snow_texture);
+    SDL_SetTextureBlendMode(snow->snow_texture, SDL_BLENDMODE_BLEND);
+    SDL_RenderTexture(renderer, snow->snow_texture, NULL, NULL);
 }
 
 /* ====== Text Functions ====== */
@@ -331,6 +466,14 @@ static void handle_key_down(Game *game, SDL_KeyboardEvent key)
             set_theme(game);
             break;
 
+        /* Increase or decrease the snowflake count */
+        case SDL_SCANCODE_M:
+            increase_snow_count(&game->snow, 500);
+            break;
+        case SDL_SCANCODE_N:
+            increase_snow_count(&game->snow, -500);
+            break;
+
         /* Right player paddle */
         case SDL_SCANCODE_I:
             game->right_paddle.direction = PADDLE_UP;
@@ -419,6 +562,8 @@ static void show_game_over_screen(Game *game)
 static void render(Game *game)
 {
     SDL_RenderClear(game->window_renderer);
+
+    render_snow(game->window_renderer, &game->snow);
 
     SDL_SetRenderDrawColor(game->window_renderer,
         game->theme->foreground[0],
@@ -574,10 +719,13 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 {
     Game *game = (Game *)appstate;
 
+    update_snow(&game->snow, 0.016f);
+
     render(game);
 
 #ifdef __EMSCRIPTEN__
     is_game_running();
+    report_wasm_frame();
 #endif
 
     if (game->state != GAME_RUNNING)
@@ -595,10 +743,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         case COLLISION_RIGHT:
             score_points(game, true);
             break;
-        case COLLISION_NONE:
         default:
             break;
-    }    
+    }
 
     if (game->max_score == MAX_SCORE_POINTS)
         game->state = GAME_OVER;
@@ -639,6 +786,9 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     if (game->window)
         SDL_DestroyWindow(game->window);
 
+    if (game->snow.snow_texture)
+        SDL_DestroyTexture(game->snow.snow_texture);
+
     destroy_text_texture(&game->welcome_text);
     destroy_text_texture(&game->welcome_description);
     destroy_text_texture(&game->paused_text);
@@ -650,12 +800,21 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 
 #ifdef __EMSCRIPTEN__
 
+EMSCRIPTEN_KEEPALIVE
 void pause_game(void)
 {
     if (game_ptr == NULL) return;
 
     if (game_ptr->state == GAME_RUNNING)
         game_ptr->state = GAME_PAUSED;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void set_snowflake_count(int count)
+{
+    if (game_ptr == NULL) return;
+
+    increase_snow_count(&game_ptr->snow, count - game_ptr->snow.snowflake_count);
 }
 
 void notify_score_points(void)
@@ -674,6 +833,24 @@ void is_game_running(void)
         if (typeof window.isGameRunning === "function")
             window.isGameRunning($0);
     }, game_ptr->state == GAME_RUNNING || game_ptr->state == GAME_PAUSED);
+}
+
+void report_wasm_frame(void)
+{
+    if (game_ptr == NULL) return;
+    EM_ASM ({
+        if (typeof window.reportWasmFrame === "function")
+            window.reportWasmFrame(performance.now());
+    });
+}
+
+void notify_snow_count_change(void)
+{
+    if (game_ptr == NULL) return;
+    EM_ASM ({
+        if (typeof window.updateSnowflakeCount === "function")
+            window.updateSnowflakeCount($0);
+    }, game_ptr->snow.snowflake_count);
 }
 
 #endif // __EMSCRIPTEN__

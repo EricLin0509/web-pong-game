@@ -7,6 +7,7 @@
 #include "text.h"
 #include "paddle.h"
 #include "ball.h"
+#include "snow.h"
 #include "themes.h"
 
 #define TOTAL_TEXT (offsetof(Game, game_over_description) \
@@ -29,6 +30,8 @@ typedef struct {
     Paddle right_paddle;
 
     Ball ball;
+
+    Snow snow;
 
     Text welcome_text;
     Text welcome_description;

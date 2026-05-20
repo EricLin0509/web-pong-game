@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Pong 雪花性能对比 - 稳定性</title>
+  <style>
+    body { background: #1a1a2e; color: #eee; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; }
+    .main { display: flex; gap: 20px; margin: 20px; }
+    .panel { background: #16213e; border-radius: 12px; padding: 10px; text-align: center; }
+    canvas { display: block; border: 2px solid #0f3460; border-radius: 8px; }
+    .wasmCanvas { width: 900px; height: 650px; }
+    .controls { margin: 15px; }
+    button, input { font-size: 16px; margin: 0 10px; }
+    #fpsDisplay { font-size: 24px; margin: 5px; }
+    .chart-container { width: 900px; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <h2>❄️ Pong + 简单雪花：Wasm vs JS 稳定性对比 ❄️</h2>
+  <div class="controls">
+    <label>雪花数量: <span id="countLabel">0</span></label>
+    <input type="range" id="snowSlider" min="0" max="80000" value="0" step="500">
+    <button id="modeBtn">当前模式: Wasm</button>
+  </div>
+  <div id="fpsDisplay">FPS: --</div>
+  <div class="main">
+    <!-- Wasm 游戏画面 -->
+    <div class="panel" id="wasmPanel">
+      <h3>🟢 WebAssembly (Pong + 雪花)</h3>
+      <canvas class="wasmCanvas" id="canvas"></canvas>
+    </div>
+    <!-- JS 雪花画面，默认隐藏 -->
+    <div class="panel" id="jsPanel" style="display:none;">
+      <h3>🟠 纯 JavaScript (雪花)</h3>
+      <canvas id="jsCanvas" width="900" height="650"></canvas>
+    </div>
+  </div>
+  <div class="chart-container">
+    <h4>帧耗时记录（最近 100 帧，单位 ms）</h4>
+    <canvas id="chartCanvas" width="900" height="200"></canvas>
+  </div>
+
+  <script>
+    function initPage() {
+      setJSSnowCount(0);
+      document.getElementById('wasmPanel').style.display = 'block';
+      document.getElementById('jsPanel').style.display = 'none';
+      switchMode('wasm'); // 这也会再设置一次，但无妨
+      requestAnimationFrame(gameLoop);
+    }
+
+    var Module = {
+      canvas: document.getElementById('canvas'),
+      onRuntimeInitialized: initPage,
+      setCanvasSize: function(width, height, isFullscreen) {
+        if (!isFullscreen) {
+          this.canvas.width = 900;
+          this.canvas.height = 650;
+          return false; // 阻止 Emscripten 自己设置
+        }
+        // 全屏时可以使用默认行为
+        return true;
+      }
+    };
+  </script>
+  {{{ SCRIPT }}}
+
+  <script>
+    // ========== 简单 JS 雪花（与你的 C 代码逻辑一致，无加重） ==========
+    const jsCanvas = document.getElementById('jsCanvas');
+    const jsCtx = jsCanvas.getContext('2d');
+    const W = 900, H = 650;
+    let jsSnowflakes = [];
+    let jsCount = 0;
+    let currentMode = 'wasm'; // 'wasm' 或 'js'
+
+    class SimpleSnow {
+      constructor() {
+        this.x = Math.random() * W;
+        this.y = Math.random() * H;
+        this.speed = 0.5 + Math.random();       // 0.5~1.5
+        this.size = 1 + Math.random() * 2;       // 1~3
+        this.opacity = 0.5 + Math.random() * 0.5; // 0.5~1.0
+      }
+      update() {
+        // 简单下落 + 正弦微风（不加重）
+        this.y += this.speed;
+        this.x += Math.sin(this.y * 0.01 + this.x) * 0.3;
+        if (this.y > H + 10) { this.y = -10; this.x = Math.random() * W; }
+        if (this.x < -10) this.x = W + 10;
+        if (this.x > W + 10) this.x = -10;
+      }
+      draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(255,255,255,${this.opacity})`;
+        ctx.fill();
+      }
+    }
+
+    function setJSSnowCount(n) {
+      jsCount = n;
+      while (jsSnowflakes.length < n) jsSnowflakes.push(new SimpleSnow());
+      if (jsSnowflakes.length > n) jsSnowflakes.length = n;
+    }
+
+    /**
+     * Wasm 端雪花数量变化时，C 代码会调用此函数来同步 UI
+     */
+    window.updateSnowflakeCount = function(count) {
+      // 更新数字显示
+      const label = document.getElementById('countLabel');
+      if (label) label.textContent = count;
+
+      // 同步滑块位置（直接修改 value 不会触发 input 事件，避免循环调用）
+      const slider = document.getElementById('snowSlider');
+      if (slider && parseInt(slider.value, 10) !== count) {
+        slider.value = count;
+      }
+
+      if (typeof setJSSnowCount === 'function' && currentMode === 'js') {
+        setJSSnowCount(count);
+      }
+    };
+
+    // ========== 模式切换 ==========
+  function switchMode(mode) {
+    currentMode = mode;
+    document.getElementById('modeBtn').textContent = 
+      mode === 'wasm' ? '当前模式: Wasm' : '当前模式: JS';
+
+    const wasmPanel = document.getElementById('wasmPanel');
+    const jsPanel = document.getElementById('jsPanel');
+
+    if (mode === 'wasm') {
+      // Wasm 模式：显示 Wasm，隐藏 JS
+      wasmPanel.style.display = 'block';
+      jsPanel.style.display = 'none';
+      if (typeof Module._set_wasm_snow_enabled === 'function')
+        Module._set_wasm_snow_enabled(1);
+      // 同步雪花数量
+      let n = parseInt(document.getElementById('snowSlider').value, 10);
+      if (typeof Module._set_snowflake_count === 'function')
+        Module._set_snowflake_count(n);
+    } else {
+      // JS 模式：显示 JS，隐藏 Wasm
+      wasmPanel.style.display = 'none';
+      jsPanel.style.display = 'block';
+      if (typeof Module._set_wasm_snow_enabled === 'function')
+        Module._set_wasm_snow_enabled(0);
+    }
+
+    // 重置帧数据
+    wasmFrameTimes = [];
+    jsFrameTimes = [];
+  }
+
+    // ========== 帧耗时记录与图表 ==========
+    const maxSamples = 100;
+    let wasmFrameTimes = [];
+    let jsFrameTimes = [];
+    let lastWasmTime = 0;
+    let lastJsTime = 0;
+    let fps = 0, frameCount = 0, lastFPSTime = performance.now();
+
+    window.reportWasmFrame = function(now) {
+      if (currentMode !== 'wasm') return;
+      if (lastWasmTime) wasmFrameTimes.push(now - lastWasmTime);
+      lastWasmTime = now;
+      if (wasmFrameTimes.length > maxSamples) wasmFrameTimes.shift();
+      frameCount++;
+    };
+
+    function renderJSFrame() {
+      if (currentMode !== 'js') return;
+      let now = performance.now();
+      if (lastJsTime) jsFrameTimes.push(now - lastJsTime);
+      lastJsTime = now;
+      if (jsFrameTimes.length > maxSamples) jsFrameTimes.shift();
+      
+      jsCtx.clearRect(0, 0, W, H);
+      for (let flake of jsSnowflakes) {
+        flake.update();
+        flake.draw(jsCtx);
+      }
+      frameCount++;
+    }
+
+    function updateFPS(now) {
+      if (now - lastFPSTime >= 1000) {
+        fps = frameCount;
+        frameCount = 0;
+        lastFPSTime = now;
+        document.getElementById('fpsDisplay').textContent = `FPS: ${fps}`;
+      }
+    }
+
+    function drawChart() {
+      const chartCanvas = document.getElementById('chartCanvas');
+      const ctx = chartCanvas.getContext('2d');
+      const W = chartCanvas.width;
+      const H = chartCanvas.height;
+      
+      ctx.clearRect(0, 0, W, H);
+      
+      let times = currentMode === 'wasm' ? wasmFrameTimes : jsFrameTimes;
+      if (times.length < 2) return;
+      
+      let maxTime = Math.max(...times, 16.7);
+      let barWidth = W / times.length;
+      
+      // 绘制帧时间柱状条（不变）
+      ctx.fillStyle = currentMode === 'wasm' ? '#4ecca3' : '#f08a5d';
+      for (let i = 0; i < times.length; i++) {
+        let h = (times[i] / maxTime) * H;
+        ctx.fillRect(i * barWidth, H - h, barWidth - 1, h);
+      }
+      
+      // ====== 加粗 16.67ms 参考线 ======
+      let y16 = H - (16.7 / maxTime) * H;
+      
+      // 设置粗线样式（例如 3px 宽，醒目颜色）
+      ctx.strokeStyle = '#ffdd57';   // 金黄色，醒目
+      ctx.lineWidth = 3;             // 加粗到 3px（原先是 1px）
+      ctx.setLineDash([]);           // 实线
+      
+      // 绘制水平线
+      ctx.beginPath();
+      ctx.moveTo(0, y16);
+      ctx.lineTo(W, y16);
+      ctx.stroke();
+      
+      // ====== 添加文字标注 "16.67ms (60FPS)" ======
+      ctx.font = 'bold 14px monospace';
+      ctx.fillStyle = '#ffdd57';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('16.67ms (60FPS)', W - 140, y16 + 20); // 放在右上角线下面一点
+      
+      // 恢复默认线宽（避免影响后续绘制）
+      ctx.lineWidth = 1;
+    }
+
+    // ========== 主循环 ==========
+    function gameLoop(now) {
+      updateFPS(now);
+      if (currentMode === 'js') renderJSFrame();
+      drawChart();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // ========== 初始化 ==========
+    document.getElementById('snowSlider').addEventListener('input', function(e) {
+      let n = parseInt(e.target.value, 10);
+      document.getElementById('countLabel').textContent = n;
+      setJSSnowCount(n);
+      if (currentMode === 'wasm' && typeof Module._set_snowflake_count === 'function')
+        Module._set_snowflake_count(n);
+    });
+
+    document.getElementById('modeBtn').addEventListener('click', function() {
+      switchMode(currentMode === 'wasm' ? 'js' : 'wasm');
+    });
+  </script>
+</body>
+</html>

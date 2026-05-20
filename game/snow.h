@@ -1,8 +1,11 @@
 #ifndef PARTICLE_H
 #define PARTICLE_H
 
+#ifdef BENCHMARK_MODE
 #define MAX_SNOWFLAKES  80000
-#define DEFAULT_SNOWFLAKES 8000
+#else
+#define MAX_SNOWFLAKES 8000
+#endif
 
 typedef struct {
     float x, y; // position

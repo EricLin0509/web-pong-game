@@ -49,6 +49,9 @@ typedef struct {
 
     GameState state;
     Theme const *theme;
+
+    Uint64 last_counter;
+    bool is_first_frame;
 } Game;
 
 /* Make sure the Text fields are continuous */

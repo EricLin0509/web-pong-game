@@ -14,6 +14,15 @@ wasm: $(SRC)
 	-sEXPORTED_RUNTIME_METHODS="['ccall', 'cwrap', 'setCanvasSize']" \
 	-sEXPORTED_FUNCTIONS="['_main', '_pause_game', '_set_snowflake_count']" \
 	--preload-file roboto.ttf \
+	$^ -o $(OUT).js
+
+wasm_benchmark: $(SRC)
+	$(CC_WASM) $(CFLAGS) $(WASM_CFLAGS) -O3 \
+	-DBENCHMARK_MODE \
+	-sENVIRONMENT=web \
+	-sEXPORTED_RUNTIME_METHODS="['ccall', 'cwrap', 'setCanvasSize']" \
+	-sEXPORTED_FUNCTIONS="['_main', '_pause_game', '_set_snowflake_count']" \
+	--preload-file roboto.ttf \
 	--shell-file benchmark.html \
 	$^ -o $(OUT).html
 

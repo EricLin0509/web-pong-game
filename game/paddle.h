@@ -7,7 +7,7 @@
 #define PADDLE_WIDTH 15
 #define PADDLE_HEIGHT 110
 #define PADDLE_PADDING 20
-#define PADDLE_SPEED 12
+#define PADDLE_SPEED_PER_SEC 600
 
 /* The movement direction of the paddle */
 typedef enum {

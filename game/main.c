@@ -258,19 +258,21 @@ static void paddle_init(Paddle *paddle, int x, int y, int width, int height)
     paddle->direction = PADDLE_STOP;
 }
 
-static void paddle_move(Paddle *paddle)
+static void paddle_move(Paddle *paddle, float dt)
 {
     if (paddle == NULL) return;
+
+    float actual_distance = PADDLE_SPEED_PER_SEC * dt;
 
     switch (paddle->direction)
     {
         case PADDLE_UP:
-            if (paddle->paddle_rect.y - PADDLE_SPEED > WINDOW_BORDER_OFFSET)
-                paddle->paddle_rect.y -= PADDLE_SPEED;
+            if (paddle->paddle_rect.y - actual_distance > WINDOW_BORDER_OFFSET)
+                paddle->paddle_rect.y -= actual_distance;
             break;
         case PADDLE_DOWN:
-            if (paddle->paddle_rect.y + PADDLE_SPEED < WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - PADDLE_HEIGHT)
-                paddle->paddle_rect.y += PADDLE_SPEED;
+            if (paddle->paddle_rect.y + actual_distance < WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - PADDLE_HEIGHT)
+                paddle->paddle_rect.y += actual_distance;
             break;
         case PADDLE_STOP:
         default:
@@ -306,8 +308,8 @@ static void ball_init(Ball *ball, int x, int y, int width, int height)
     ball->rect.w = width;
     ball->rect.h = height;
     
-    ball->speed_x = (SHOUD_MOVE_REVERSE) ? -INITIAL_SPEED : INITIAL_SPEED;
-    ball->speed_y = (SHOUD_MOVE_REVERSE) ? -INITIAL_SPEED : INITIAL_SPEED;
+    ball->speed_x = (SHOUD_MOVE_REVERSE) ? -INITIAL_SPEED_PER_SEC : INITIAL_SPEED_PER_SEC;
+    ball->speed_y = (SHOUD_MOVE_REVERSE) ? -INITIAL_SPEED_PER_SEC : INITIAL_SPEED_PER_SEC;
 }
 
 static void reset_ball(Ball *ball, bool left_serve)
@@ -316,9 +318,9 @@ static void reset_ball(Ball *ball, bool left_serve)
 
     ball->rect.x = (WINDOW_WIDTH - BALL_SIZE) / 2;
     ball->rect.y = (WINDOW_HEIGHT - BALL_SIZE) / 2;
-    float speed_x = INITIAL_SPEED;
+    float speed_x = INITIAL_SPEED_PER_SEC;
     ball->speed_x = (left_serve) ? speed_x : -speed_x;
-    ball->speed_y = (SHOUD_MOVE_REVERSE) ? INITIAL_SPEED : -INITIAL_SPEED;
+    ball->speed_y = (SHOUD_MOVE_REVERSE) ? INITIAL_SPEED_PER_SEC : -INITIAL_SPEED_PER_SEC;
 }
 
 static void speed_up_ball(Ball *ball)
@@ -331,10 +333,11 @@ static void speed_up_ball(Ball *ball)
         ball->speed_y *= SPEED_UP_RATE;
 }
 
-static CollisionType ball_collision(Ball *ball, Paddle *left_paddle, Paddle *right_paddle)
+static CollisionType ball_collision(Ball *ball, Paddle *left_paddle, Paddle *right_paddle, float dt)
 {
     if (ball == NULL || left_paddle == NULL || right_paddle == NULL) return COLLISION_NONE;
 
+    // First handle the score points
     if (ball->rect.x < WINDOW_BORDER_OFFSET)
     {
         reset_ball(ball, true);
@@ -346,23 +349,34 @@ static CollisionType ball_collision(Ball *ball, Paddle *left_paddle, Paddle *rig
         return COLLISION_RIGHT;
     }
 
-    if (ball->rect.y + ball->speed_y < WINDOW_BORDER_OFFSET || ball->rect.y + ball->speed_y > WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - BALL_SIZE)
-        ball->speed_y *= -1;
-
-    Paddle *chosen_paddle = (ball->rect.x < WINDOW_WIDTH / 2) ? left_paddle : right_paddle;
-
-    if (SDL_HasRectIntersectionFloat(&(ball->rect), &(chosen_paddle->paddle_rect)))
+    // Bounce off the top and bottom walls
+    float new_y = ball->rect.y + ball->speed_y * dt;
+    if (new_y < WINDOW_BORDER_OFFSET || new_y > WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - BALL_SIZE)
     {
-        ball->speed_x = (ball->speed_x + JITTER) * -1;
+        ball->speed_y *= -1;
+        new_y = (new_y < WINDOW_BORDER_OFFSET) ? WINDOW_BORDER_OFFSET 
+                : WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - BALL_SIZE;
+    }
+
+    // Predict the ball's next position
+    float new_x = ball->rect.x + ball->speed_x * dt;
+    SDL_FRect next_rect = { new_x, new_y, ball->rect.w, ball->rect.h };
+
+    Paddle *chosen_paddle = (new_x < WINDOW_WIDTH / 2) ? left_paddle : right_paddle;
+
+    if (SDL_HasRectIntersectionFloat(&next_rect, &(chosen_paddle->paddle_rect)))
+    {
+        ball->speed_x = -(ball->speed_x + JITTER_PER_SEC);
         if (ball->speed_x > 0)
-            ball->rect.x =chosen_paddle->paddle_rect.x + chosen_paddle->paddle_rect.w;
+            new_x = chosen_paddle->paddle_rect.x + chosen_paddle->paddle_rect.w;
         else
-            ball->rect.x =chosen_paddle->paddle_rect.x - BALL_SIZE;
+            new_x = chosen_paddle->paddle_rect.x - BALL_SIZE;
         speed_up_ball(ball);
     }
 
-    ball->rect.x += ball->speed_x;
-    ball->rect.y += ball->speed_y;
+    // 应用最终位置
+    ball->rect.x = new_x;
+    ball->rect.y = new_y;
 
     return COLLISION_NONE;
 }
@@ -467,10 +481,10 @@ static void handle_key_down(Game *game, SDL_KeyboardEvent key)
             break;
 
         /* Increase or decrease the snowflake count */
-        case SDL_SCANCODE_M:
+        case SDL_SCANCODE_B:
             increase_snow_count(&game->snow, 500);
             break;
-        case SDL_SCANCODE_N:
+        case SDL_SCANCODE_V:
             increase_snow_count(&game->snow, -500);
             break;
 
@@ -599,7 +613,23 @@ static void render(Game *game)
         255);
 
     SDL_RenderPresent(game->window_renderer);
-    SDL_Delay(16); // Limit the frame rate to 60 FPS
+}
+
+static float calculate_delta_time(Game *game)
+{
+    Uint64 now = SDL_GetPerformanceCounter();
+    if (game->is_first_frame)
+    {
+        game->last_counter = now;
+        game->is_first_frame = false;
+    }
+    float dt = (float)(now - game->last_counter) / (float)SDL_GetPerformanceFrequency();
+    game->last_counter = now;
+
+    // limit the delta time
+    if (dt > 0.1f) dt = 0.1f;
+
+    return dt;
 }
 
 static void score_points(Game *game, bool is_left_score)
@@ -719,7 +749,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 {
     Game *game = (Game *)appstate;
 
-    update_snow(&game->snow, 0.016f);
+    float dt = calculate_delta_time(game);
+
+    update_snow(&game->snow, dt);
 
     render(game);
 
@@ -731,10 +763,10 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     if (game->state != GAME_RUNNING)
         return SDL_APP_CONTINUE;
 
-    paddle_move(&game->left_paddle);
-    paddle_move(&game->right_paddle);
+    paddle_move(&game->left_paddle, dt);
+    paddle_move(&game->right_paddle, dt);
 
-    CollisionType collision = ball_collision(&game->ball, &game->left_paddle, &game->right_paddle);
+    CollisionType collision = ball_collision(&game->ball, &game->left_paddle, &game->right_paddle, dt);
     switch (collision)
     {
         case COLLISION_LEFT:

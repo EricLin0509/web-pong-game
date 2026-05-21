@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <time.h>
+#include <stdint.h>
 #include <math.h>
 #include <stdbool.h>
 
@@ -20,7 +21,8 @@
 #define WINDOW_TITLE "Pong"
 #define LINE_WIDTH 2
 
-#define MAX_SCORE_POINTS 11
+#define CLASSIC_WIN_SCORE 11
+#define INFINITE_WIN_SCORE SIZE_MAX // Use SIZE_MAX to represent infinity
 
 #ifdef __EMSCRIPTEN__
 Game *game_ptr = NULL; // Expose the game struct to WebAssembly
@@ -57,6 +59,25 @@ static void set_theme(Game *game)
         if (!is_colored)
             fprintf(stderr, WARNING_TEXT " Failed to set color of text texture: %s\n", SDL_GetError());
         text_region++;
+    }
+}
+
+/* ===== Mode switch functions ====== */
+static void switch_mode(Game *game)
+{
+    if (game == NULL) return;
+    if (game->state != GAME_INIT) return; // Only switch to the main menu when the game is in the init state
+
+    switch (game->mode)
+    {
+        case MODE_CLASSIC:
+            game->mode = MODE_INFINITE;
+            game->score_to_win = INFINITE_WIN_SCORE;
+            break;
+        case MODE_INFINITE:
+            game->mode = MODE_CLASSIC;
+            game->score_to_win = CLASSIC_WIN_SCORE;
+            break;
     }
 }
 
@@ -478,6 +499,10 @@ static void handle_key_down(Game *game, SDL_KeyboardEvent key)
         case SDL_SCANCODE_C:
             set_theme(game);
             break;
+        /* Switch the mode */
+        case SDL_SCANCODE_M:
+            switch_mode(game);
+            break;
 
         /* Increase or decrease the snowflake count */
         case SDL_SCANCODE_B:
@@ -515,6 +540,16 @@ static void show_middle_line(Game *game)
     SDL_RenderFillRect(game->window_renderer, &(game->middle_line));
 }
 
+static void show_mode_screen(Game *game)
+{
+    if (game == NULL) return;
+    Text *mode_text = (game->mode == MODE_CLASSIC) ? &game->current_mode_classic : &game->current_mode_infinite;
+
+    render_text_texture(mode_text, game->window_renderer,
+                             20,
+                             15);
+}
+
 static void show_welcome_screen(Game *game)
 {
     if (game == NULL) return;
@@ -533,8 +568,8 @@ static void show_paused_screen(Game *game)
     if (game == NULL) return;
 
     render_text_texture(&game->paused_text, game->window_renderer,
-                             10,
-                             (WINDOW_HEIGHT - game->paused_text.text_rect.h) - 10);
+                             20,
+                             (WINDOW_HEIGHT - game->paused_text.text_rect.h) - 15);
 }
 
 static void show_game_screen(Game *game)
@@ -590,6 +625,7 @@ static void render(Game *game)
     {
         case GAME_INIT:
             show_welcome_screen(game);
+            show_mode_screen(game);
             break;
         case GAME_PAUSED:
             show_paused_screen(game);
@@ -641,6 +677,9 @@ static void score_points(Game *game, bool is_left_score)
     if (*score >= game->max_score)
         game->max_score = *score;
 
+    if (*score == game->score_to_win)
+        game->state = GAME_OVER;
+
 #ifdef __EMSCRIPTEN__
     notify_score_points();
 #endif
@@ -666,7 +705,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     }
 
     /* Initialize boarder and middle line */
-    game.window_boarder = (SDL_FRect){
+    game.window_boarder = (SDL_FRect) {
         WINDOW_BORDER_OFFSET,
         WINDOW_BORDER_OFFSET,
         WINDOW_WIDTH - 2 * WINDOW_BORDER_OFFSET,
@@ -714,6 +753,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     font_loaded &= create_text_texture(&game.welcome_text, FONT_PATH, "Welcome to Pong", FONT_SIZE, game.window_renderer, FONT_COLOR);
     font_loaded &= create_text_texture(&game.welcome_description, FONT_PATH, "Press [space] to start", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(&game.current_mode_classic, FONT_PATH, "Classic Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(&game.current_mode_infinite, FONT_PATH, "Infinite Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
 
     font_loaded &= create_text_texture(&game.paused_text, FONT_PATH, "Paused", FONT_SIZE, game.window_renderer, FONT_COLOR);
 
@@ -737,6 +778,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 #ifdef __EMSCRIPTEN__
     notify_score_points();
 #endif
+
+    /* Initialize game mode to classic mode */
+    game.mode = MODE_CLASSIC;
+    game.score_to_win = CLASSIC_WIN_SCORE;
 
     game.state = GAME_INIT;
     game.resume_delay_time = 0.0f;
@@ -785,9 +830,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         default:
             break;
     }
-
-    if (game->max_score == MAX_SCORE_POINTS)
-        game->state = GAME_OVER;
 
     return SDL_APP_CONTINUE;
 }

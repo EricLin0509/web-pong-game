@@ -20,6 +20,11 @@ typedef enum {
     GAME_OVER
 } GameState;
 
+typedef enum {
+    MODE_CLASSIC,
+    MODE_INFINITE
+} GameMode;
+
 typedef struct {
     SDL_Window *window;
     SDL_FRect window_boarder;
@@ -35,12 +40,17 @@ typedef struct {
 
     Text welcome_text;
     Text welcome_description;
+    Text current_mode_classic;
+    Text current_mode_infinite;
 
     Text paused_text;
 
     Text game_over_text;
     Text game_over_description;
 
+    GameMode mode;
+
+    size_t score_to_win;
     size_t max_score;
     size_t left_score;
     size_t right_score;
@@ -57,7 +67,9 @@ typedef struct {
 /* Make sure the Text fields are continuous */
 #define TEXT_FIELDS \
     X(welcome_text, welcome_description) \
-    X(welcome_description, paused_text) \
+    X(welcome_description, current_mode_classic) \
+    X(current_mode_classic, current_mode_infinite) \
+    X(current_mode_infinite, paused_text) \
     X(paused_text, game_over_text) \
     X(game_over_text, game_over_description)
 

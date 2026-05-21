@@ -24,6 +24,11 @@
 #define CLASSIC_WIN_SCORE 11
 #define INFINITE_WIN_SCORE SIZE_MAX // Use SIZE_MAX to represent infinity
 
+#ifndef BENCHMARK_MODE // Disable benchmark mode by default
+#define IDLE_TIMEOUT_MS 2000 // 2 seconds idle timeout
+#define IDLE_FPS 20
+#endif
+
 #ifdef __EMSCRIPTEN__
 Game *game_ptr = NULL; // Expose the game struct to WebAssembly
 
@@ -667,6 +672,30 @@ static float calculate_delta_time(Game *game)
     return dt;
 }
 
+#ifndef BENCHMARK_MODE
+
+/* Limit the FPS to save energy */
+static void handle_idle(Game *game)
+{
+    if (game == NULL) return;
+    if (game->state == GAME_RUNNING) return;
+
+    /* Calculate the idle time */
+    Uint64 now = SDL_GetTicks();
+    Uint64 idle_ms = now - game->last_key_ticks;
+    if (idle_ms > IDLE_TIMEOUT_MS)
+    {
+        Uint64 target_frame_ms = 1000 / IDLE_FPS; // Target frame time in milliseconds
+        Uint64 elapsed = now - game->last_frame_ticks; // Elapsed time since last frame
+        if (elapsed < target_frame_ms)
+            SDL_Delay(target_frame_ms - elapsed); // Wait for the remaining time
+    }
+
+    game->last_frame_ticks = SDL_GetTicks();
+}
+
+#endif
+
 static void score_points(Game *game, bool is_left_score)
 {
     if (game == NULL) return;
@@ -785,12 +814,20 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     game.state = GAME_INIT;
     game.resume_delay_time = 0.0f;
+#ifndef BENCHMARK_MODE
+    game.last_key_ticks = SDL_GetTicks();
+    game.last_frame_ticks = SDL_GetTicks();
+#endif
     return SDL_APP_CONTINUE;
 }
 
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
     Game *game = (Game *)appstate;
+
+#ifndef BENCHMARK_MODE
+    handle_idle(game);
+#endif
 
     float dt = calculate_delta_time(game);
 
@@ -843,9 +880,15 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         case SDL_EVENT_QUIT:
             return SDL_APP_SUCCESS;
         case SDL_EVENT_KEY_DOWN:
+#ifndef BENCHMARK_MODE
+            game->last_key_ticks = SDL_GetTicks();
+#endif
             handle_key_down(game, event->key);
             break;
         case SDL_EVENT_KEY_UP:
+#ifndef BENCHMARK_MODE
+            game->last_key_ticks = SDL_GetTicks();
+#endif
             handle_key_up(game, event->key);
             break;
         default:

@@ -55,13 +55,16 @@ typedef struct {
     size_t left_score;
     size_t right_score;
 
-    float resume_delay_time;
-
     GameState state;
     Theme const *theme;
 
     Uint64 last_counter;
     bool is_first_frame;
+    float resume_delay_time;
+#ifndef BENCHMARK_MODE
+    Uint64 last_key_ticks;
+    Uint64 last_frame_ticks;
+#endif
 } Game;
 
 /* Make sure the Text fields are continuous */

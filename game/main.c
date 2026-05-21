@@ -14,8 +14,8 @@
 #include "ansi-color.h"
 #include "game.h"
 
-#define WINDOW_WIDTH 900
-#define WINDOW_HEIGHT 650
+#define WINDOW_WIDTH 1024
+#define WINDOW_HEIGHT 768
 #define WINDOW_BORDER_OFFSET 10
 #define WINDOW_TITLE "Pong"
 #define LINE_WIDTH 2

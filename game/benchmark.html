@@ -8,11 +8,11 @@
     .main { display: flex; gap: 20px; margin: 20px; }
     .panel { background: #16213e; border-radius: 12px; padding: 10px; text-align: center; }
     canvas { display: block; border: 2px solid #0f3460; border-radius: 8px; }
-    .wasmCanvas { width: 900px; height: 650px; }
+    .wasmCanvas { width: 1024px; height: 768px; }
     .controls { margin: 15px; }
     button, input { font-size: 16px; margin: 0 10px; }
     #fpsDisplay { font-size: 24px; margin: 5px; }
-    .chart-container { width: 900px; margin: 0 auto; }
+    .chart-container { width: 1024px; margin: 0 auto; }
   </style>
 </head>
 <body>
@@ -32,12 +32,12 @@
     <!-- JS 雪花画面，默认隐藏 -->
     <div class="panel" id="jsPanel" style="display:none;">
       <h3>🟠 纯 JavaScript (仅雪花)</h3>
-      <canvas id="jsCanvas" width="900" height="650"></canvas>
+      <canvas id="jsCanvas" width="1024" height="768"></canvas>
     </div>
   </div>
   <div class="chart-container">
     <h4>帧耗时记录（最近 100 帧，单位 ms）</h4>
-    <canvas id="chartCanvas" width="900" height="200"></canvas>
+    <canvas id="chartCanvas" width="1024" height="200"></canvas>
   </div>
 
   <script>
@@ -54,8 +54,8 @@
       onRuntimeInitialized: initPage,
       setCanvasSize: function(width, height, isFullscreen) {
         if (!isFullscreen) {
-          this.canvas.width = 900;
-          this.canvas.height = 650;
+          this.canvas.width = 1024;
+          this.canvas.height = 768;
           return false; // 阻止 Emscripten 自己设置
         }
         // 全屏时可以使用默认行为
@@ -69,7 +69,7 @@
     // ========== 简单 JS 雪花（与你的 C 代码逻辑一致，无加重） ==========
     const jsCanvas = document.getElementById('jsCanvas');
     const jsCtx = jsCanvas.getContext('2d');
-    const W = 900, H = 650;
+    const W = 1024, H = 768;
     let jsSnowflakes = [];
     let jsCount = 0;
     let currentMode = 'wasm'; // 'wasm' 或 'js'
@@ -123,37 +123,45 @@
       }
     };
 
-    // ========== 模式切换 ==========
-  function switchMode(mode) {
-    currentMode = mode;
-    document.getElementById('modeBtn').textContent = 
-      mode === 'wasm' ? '当前模式: Wasm' : '当前模式: JS';
-
-    const wasmPanel = document.getElementById('wasmPanel');
-    const jsPanel = document.getElementById('jsPanel');
-
-    if (mode === 'wasm') {
-      // Wasm 模式：显示 Wasm，隐藏 JS
-      wasmPanel.style.display = 'block';
-      jsPanel.style.display = 'none';
-      if (typeof Module._set_wasm_snow_enabled === 'function')
-        Module._set_wasm_snow_enabled(1);
-      // 同步雪花数量
+    function syncSnowflakeCount() {
       let n = parseInt(document.getElementById('snowSlider').value, 10);
+
+      /* Wasm 端 */
       if (typeof Module._set_snowflake_count === 'function')
         Module._set_snowflake_count(n);
-    } else {
-      // JS 模式：显示 JS，隐藏 Wasm
-      wasmPanel.style.display = 'none';
-      jsPanel.style.display = 'block';
-      if (typeof Module._set_wasm_snow_enabled === 'function')
-        Module._set_wasm_snow_enabled(0);
+
+      /* JS 端 */
+      if (typeof setJSSnowCount === 'function')
+        setJSSnowCount(n);
     }
 
-    // 重置帧数据
-    wasmFrameTimes = [];
-    jsFrameTimes = [];
-  }
+
+    // ========== 模式切换 ==========
+    function switchMode(mode) {
+      currentMode = mode;
+      document.getElementById('modeBtn').textContent = 
+        mode === 'wasm' ? '当前模式: Wasm' : '当前模式: JS';
+
+      const wasmPanel = document.getElementById('wasmPanel');
+      const jsPanel = document.getElementById('jsPanel');
+
+      // 同步雪花数量
+      syncSnowflakeCount();
+
+      if (mode === 'wasm') {
+        // Wasm 模式：显示 Wasm，隐藏 JS
+        wasmPanel.style.display = 'block';
+        jsPanel.style.display = 'none';
+      } else {
+        // JS 模式：显示 JS，隐藏 Wasm
+        wasmPanel.style.display = 'none';
+        jsPanel.style.display = 'block';
+      }
+
+      // 重置帧数据
+      wasmFrameTimes = [];
+      jsFrameTimes = [];
+    }
 
     // ========== 帧耗时记录与图表 ==========
     const maxSamples = 100;
@@ -250,11 +258,7 @@
 
     // ========== 初始化 ==========
     document.getElementById('snowSlider').addEventListener('input', function(e) {
-      let n = parseInt(e.target.value, 10);
-      document.getElementById('countLabel').textContent = n;
-      setJSSnowCount(n);
-      if (currentMode === 'wasm' && typeof Module._set_snowflake_count === 'function')
-        Module._set_snowflake_count(n);
+      syncSnowflakeCount();
     });
 
     document.getElementById('modeBtn').addEventListener('click', function() {

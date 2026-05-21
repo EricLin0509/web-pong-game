@@ -138,8 +138,8 @@ canvas {
   display: block;
   width: 100%;
   height: 100%;
-  max-width: 75vw;
-  max-height: 75vh;
+  max-width: 80vw;
+  max-height: 80vh;
   object-fit: contain;
   image-rendering: crisp-edges;
 }

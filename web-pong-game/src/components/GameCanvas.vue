@@ -1,19 +1,31 @@
 <template>
-  <div class="screen-container">
-    <!-- Player 1 score -->
-     <div :class="['score score-left', { show: isGameRunning, flash: flashLeft }]">{{ leftScore }}</div>
-    <!-- The canvas frame -->
-    <div :class="['frame', { 'animate-slide-down': isWasmLoaded }]" ref="frameRef">
-      <!-- The canvas element -->
-      <canvas
-        ref="canvasRef"
-        id="canvas"
-        tabindex="0"
-        @click="canvasRef?.focus()"
-      ></canvas>
+  <div class="game-wrapper">
+    <div :class="['fps-display', { 'animate-slide-down': isWasmLoaded },
+      { 'fps-low': fps < 60 && fps >= 30, 'fps-very-low': fps < 30 }]">FPS: {{ fps }}</div>
+    <div class="screen-container">
+      <!-- Player 1 score -->
+      <div :class="['score score-left', { show: isGameRunning, flash: flashLeft }]">{{ leftScore }}</div>
+      <!-- The canvas frame -->
+      <div :class="['frame', { 'animate-slide-down': isWasmLoaded }]" ref="frameRef">
+        <canvas ref="canvasRef" id="canvas" tabindex="0" @click="canvasRef?.focus()"></canvas>
+      </div>
+      <!-- Player 2 score -->
+      <div :class="['score score-right', { show: isGameRunning, flash: flashRight }]">{{ rightScore }}</div>
     </div>
-    <!-- Player 2 score -->
-     <div :class="['score score-right', { show: isGameRunning, flash: flashRight }]">{{ rightScore }}</div>
+
+    <div :class="['control-bar', { 'animate-slide-up': isWasmLoaded }]">
+      <label>❄️ Snowflakes: <span class="count-value">{{ snowCount }}</span></label>
+      <input
+        type="range"
+        class="snow-slider"
+        min="0"
+        max="8000"
+        step="500"
+        v-model="snowCount"
+        @input="onSnowCountChange"
+        :disabled="!isWasmLoaded"
+      />
+    </div>
   </div>
 </template>
 
@@ -26,28 +38,60 @@ const canvasRef = ref(null)
 
 const leftScore = ref(0)
 const flashLeft = ref(false)
-
 const rightScore = ref(0)
 const flashRight = ref(false)
 
 const isWasmLoaded = ref(false)
 const isGameRunning = ref(false)
 
+// FPS display
+const fps = ref(0)
+let frameCount = 0
+let lastFpsTime = performance.now()
+let rafId = null
+
+// Snowflake count
+const snowCount = ref(0)
+
 let pongModule = null
 
-function handleVisibilityChange() { // pause game when tab is not active
+// When snowflake count changes, update the C side
+function onSnowCountChange() {
+  if (pongModule && typeof pongModule._set_snowflake_count === 'function') {
+    pongModule._set_snowflake_count(snowCount.value)
+  }
+}
+
+// Update FPS every second
+function updateFPS() {
+  const now = performance.now()
+  frameCount++
+  if (now - lastFpsTime >= 1000) {
+    fps.value = frameCount
+    frameCount = 0
+    lastFpsTime = now
+  }
+  rafId = requestAnimationFrame(updateFPS)
+}
+
+// Update snowflake count from C side
+window.updateSnowflakeCount = (count) => {
+  snowCount.value = count
+}
+
+function handleVisibilityChange() {
   if (document.hidden && pongModule) {
     pongModule._pause_game()
   }
 }
 
-function updateFrameStyles() { // Set frame styles based on window size
+function updateFrameStyles() {
   if (!frameRef.value) return
   const min_size = Math.min(window.innerHeight, window.innerWidth)
 
   const borderSize = Math.max(2, Math.min(6, min_size * 0.015))
   const cornerRadius = Math.max(8, Math.min(20, min_size * 0.03))
-  
+
   frameRef.value.style.setProperty('--border-size', borderSize + 'px')
   frameRef.value.style.setProperty('--corner-radius', cornerRadius + 'px')
 }
@@ -57,20 +101,16 @@ onMounted(async () => {
     console.error('Canvas ref is not available')
     return
   }
-  
+
   window.updateScore = (left, right) => {
     if (left > leftScore.value) {
       flashLeft.value = true
-      setTimeout(() => {
-        flashLeft.value = false
-      }, 200)
+      setTimeout(() => { flashLeft.value = false }, 200)
     }
 
     if (right > rightScore.value) {
       flashRight.value = true
-      setTimeout(() => {
-        flashRight.value = false
-      }, 200)
+      setTimeout(() => { flashRight.value = false }, 200)
     }
 
     leftScore.value = left
@@ -86,27 +126,111 @@ onMounted(async () => {
 
   pongModule = await loadWasm(canvasRef.value)
   isWasmLoaded.value = true
+
+  // Initialize snowflake count
+  if (pongModule && typeof pongModule._set_snowflake_count === 'function') {
+    pongModule._set_snowflake_count(snowCount.value)
+  }
+
+  // Initialize FPS
+  updateFPS()
 })
 
 onBeforeUnmount(() => {
   delete window.updateScore
+  delete window.updateSnowflakeCount
   window.removeEventListener('resize', updateFrameStyles)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  if (rafId) cancelAnimationFrame(rafId)
 })
-
 </script>
 
 <style scoped>
-.screen-container {
+.game-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   height: 100vh;
+  background: #0a0f1a;
+}
+
+.control-bar {
+  margin-bottom: 15px;
+  background: rgba(0,0,0,0.6);
+  padding: 8px 20px;
+  border-radius: 30px;
+  backdrop-filter: blur(5px);
+  font-family: monospace;
+  font-size: 18px;
+  color: #ccddee;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.fps-display {
+  font-family: monospace;
+  font-size: 18px;
+  background: #1e2a3a;
+  padding: 4px 12px;
+  border-radius: 20px;
+  color: #88ffaa;
+  font-weight: bold;
+  letter-spacing: 1px;
+  box-shadow: 0 0 4px rgba(0,0,0,0.3);
+}
+
+.fps-display.fps-low {
+  color: #ffaa66;
+  text-shadow: 0 0 4px rgba(255,170,0,0.5);
+}
+
+.fps-display.fps-very-low {
+  color: #ff4444;
+  text-shadow: 0 0 4px rgba(255,0,0,0.5);
+}
+  
+
+.count-value {
+  font-weight: bold;
+  color: #ffaa66;
+  min-width: 70px;
+  display: inline-block;
+  text-align: center;
+}
+
+.snow-slider {
+  width: 300px;
+  cursor: pointer;
+  background: #2a3a5a;
+  height: 4px;
+  border-radius: 2px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.snow-slider:focus {
+  outline: none;
+}
+.snow-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffaa66;
+  cursor: pointer;
+}
+
+.screen-container {
+  width: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
-  overflow: hidden;
   gap: 20px;
-  padding:0 10px;
+  padding: 0 10px;
   box-sizing: border-box;
+  flex: 1;
 }
 
 .score {
@@ -124,8 +248,7 @@ onBeforeUnmount(() => {
 .frame {
   --border-size: 6px;
   --corner-radius: 20px;
-
-  display: inline-block; /* Adapts to the size of canvas */
+  display: inline-block;
   border: var(--border-size) solid #55868b;
   border-radius: var(--corner-radius);
   overflow: hidden;
@@ -138,18 +261,28 @@ canvas {
   display: block;
   width: 100%;
   height: 100%;
-  max-width: 80vw;
-  max-height: 80vh;
+  max-width: 75vw;
+  max-height: 75vh;
   object-fit: contain;
   image-rendering: crisp-edges;
 }
 
-/* Animations */
-
+/* Animation */
 @keyframes slideDownEnter {
   0% {
     opacity: 0;
     transform: translateY(-60px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUpEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(60px);
   }
   100% {
     opacity: 1;
@@ -171,6 +304,12 @@ canvas {
   animation: slideDownEnter 0.5s ease-out forwards;
 }
 
+.animate-slide-up {
+  animation: slideUpEnter 0.8s ease-out forwards;
+}
+
+.fps-display,
+.control-bar,
 .score,
 .frame {
   opacity: 0;
@@ -182,5 +321,4 @@ canvas {
   opacity: 1;
   transform: translateY(0);
 }
-
 </style>

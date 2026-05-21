@@ -5,7 +5,7 @@
 #include <SDL3/SDL_main.h>
 
 #define PADDLE_WIDTH 15
-#define PADDLE_HEIGHT 110
+#define PADDLE_HEIGHT 120
 #define PADDLE_PADDING 20
 #define PADDLE_SPEED_PER_SEC 600
 

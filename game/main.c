@@ -395,7 +395,6 @@ static void game_reset(Game *game)
     if (game == NULL) return;
 
     game->max_score = 0;
-    game->rounds = 0;
     game->left_score = 0;
     game->right_score = 0;
     reset_ball(&game->ball, SHOUD_MOVE_REVERSE);
@@ -448,7 +447,7 @@ static void handle_space_key(Game *game)
             game->state = GAME_PAUSED;
             break;
         case GAME_PAUSED:
-            SDL_Delay(256); // Wait for a while before resuming the game
+            game->resume_delay_time = 0.25f;
             game->state = GAME_RUNNING;
             break;
         case GAME_OVER:
@@ -636,8 +635,6 @@ static void score_points(Game *game, bool is_left_score)
 {
     if (game == NULL) return;
 
-    game->rounds++;
-
     size_t *score = (is_left_score) ? &game->left_score : &game->right_score;
     (*score)++;
 
@@ -742,6 +739,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 #endif
 
     game.state = GAME_INIT;
+    game.resume_delay_time = 0.0f;
     return SDL_APP_CONTINUE;
 }
 
@@ -759,6 +757,15 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     is_game_running();
     report_wasm_frame();
 #endif
+
+    /* Resuming the game after pause */
+    if (game->state == GAME_RUNNING &&
+            game->resume_delay_time > 0)
+    {
+        game->resume_delay_time -= dt;
+        return SDL_APP_CONTINUE;
+    }
+    else game->resume_delay_time = 0.0f;
 
     if (game->state != GAME_RUNNING)
         return SDL_APP_CONTINUE;

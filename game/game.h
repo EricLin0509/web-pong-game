@@ -41,11 +41,11 @@ typedef struct {
     Text game_over_text;
     Text game_over_description;
 
-    size_t rounds;
     size_t max_score;
-
     size_t left_score;
     size_t right_score;
+
+    float resume_delay_time;
 
     GameState state;
     Theme const *theme;

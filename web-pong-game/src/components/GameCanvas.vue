@@ -27,11 +27,24 @@
       />
     </div>
   </div>
+  <div :class="['history-panel', { 'animate-slide-right': isWasmLoaded }]" v-if="historyRecords.length">
+    <h3>🏆 Recent scores (Classic)</h3>
+    <ul>
+      <li v-for="(record, idx) in historyRecords" :key="idx">
+        {{ record.left }} : {{ record.right }} &nbsp; 
+        <span class="time">{{ formatTime(record.timestamp) }}</span>
+      </li>
+    </ul>
+    <button @click="clearHistory" class="clear-btn">Clear History</button>
+  </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { loadWasm } from '../composables/useWasm.js'
+
+// History records
+const historyRecords = ref([])
 
 const frameRef = ref(null)
 const canvasRef = ref(null)
@@ -96,6 +109,37 @@ function updateFrameStyles() {
   frameRef.value.style.setProperty('--corner-radius', cornerRadius + 'px')
 }
 
+function loadHistory() {
+  const stored = localStorage.getItem('pong_score_history')
+  if (stored) {
+    try {
+      historyRecords.value = JSON.parse(stored)
+    } catch(e) { console.error(e) }
+  }
+}
+
+function saveScoreRecord(left, right) {
+  const newRecord = {
+    left: left,
+    right: right,
+    timestamp: Date.now()
+  }
+  let records = [...historyRecords.value]
+  records.unshift(newRecord)
+  if (records.length > 5) records = records.slice(0, 5) // Only keep the last 5 records
+  historyRecords.value = records
+  localStorage.setItem('pong_score_history', JSON.stringify(records))
+}
+
+function clearHistory() {
+  historyRecords.value = []
+  localStorage.removeItem('pong_score_history')
+}
+
+function formatTime(timestamp) {
+  return new Date(timestamp).toLocaleString()
+}
+
 onMounted(async () => {
   if (!canvasRef.value) {
     console.error('Canvas ref is not available')
@@ -121,6 +165,10 @@ onMounted(async () => {
     isGameRunning.value = isRunning
   }
 
+  window.onGameOver = (left, right) => {
+    saveScoreRecord(left, right)
+  }
+
   window.addEventListener('resize', updateFrameStyles)
   document.addEventListener('visibilitychange', handleVisibilityChange)
 
@@ -134,10 +182,14 @@ onMounted(async () => {
 
   // Initialize FPS
   updateFPS()
+
+  // Load history records
+  loadHistory()
 })
 
 onBeforeUnmount(() => {
   delete window.updateScore
+  delete window.onGameOver
   delete window.updateSnowflakeCount
   window.removeEventListener('resize', updateFrameStyles)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
@@ -153,7 +205,6 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 100%;
   height: 100vh;
-  background: #0a0f1a;
 }
 
 .control-bar {
@@ -267,6 +318,52 @@ canvas {
   image-rendering: crisp-edges;
 }
 
+.history-panel {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  border-radius: 16px;
+  padding: 12px 20px;
+  font-family: monospace;
+  color: #ccddee;
+  min-width: 200px;
+  border-left: 4px solid #ffaa66;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.history-panel h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: #ffaa66;
+}
+.history-panel ul {
+  margin: 0;
+  padding-left: 20px;
+}
+.history-panel li {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.time {
+  font-size: 11px;
+  opacity: 0.7;
+}
+.clear-btn {
+  margin-top: 8px;
+  background: #3a4a6a;
+  border: none;
+  color: white;
+  border-radius: 20px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.clear-btn:hover {
+  background: #ffaa66;
+  color: #0a0f1a;
+}
+
 /* Animation */
 @keyframes slideDownEnter {
   0% {
@@ -290,6 +387,17 @@ canvas {
   }
 }
 
+@keyframes slideRightEnter {
+  from {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 @keyframes scoreFlash {
   0% { text-shadow: 0 0 0px rgba(255,255,255,0); opacity: 1; }
   50% { text-shadow: 0 0 20px rgba(255,255,255,0.9); opacity: 0.7; transform: scale(1.1); }
@@ -306,6 +414,10 @@ canvas {
 
 .animate-slide-up {
   animation: slideUpEnter 0.8s ease-out forwards;
+}
+
+.animate-slide-right {
+  animation: slideRightEnter 0.7s ease-out forwards;
 }
 
 .fps-display,

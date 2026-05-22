@@ -35,6 +35,7 @@ Game *game_ptr = NULL; // Expose the game struct to WebAssembly
 void pause_game(void);
 void set_snowflake_count(int count);
 void notify_score_points(void);
+void notify_game_over(void);
 void is_game_running(void);
 void report_wasm_frame(void);
 void notify_snow_count_change(void);
@@ -71,7 +72,7 @@ static void set_theme(Game *game)
 static void switch_mode(Game *game)
 {
     if (game == NULL) return;
-    if (game->state != GAME_INIT) return; // Only switch to the main menu when the game is in the init state
+    if (game->state != GAME_INIT) return; // The game mode can only be switched when the game is in the init state
 
     switch (game->mode)
     {
@@ -809,7 +810,13 @@ static void score_points(Game *game, bool is_left_score)
         game->max_score = *score;
 
     if (*score == game->score_to_win)
+    {
         game->state = GAME_OVER;
+
+#ifdef __EMSCRIPTEN__
+        notify_game_over();
+#endif
+    }
 
 #ifdef __EMSCRIPTEN__
     notify_score_points();
@@ -1047,6 +1054,8 @@ void set_snowflake_count(int count)
 {
     if (game_ptr == NULL) return;
 
+    game_ptr->last_key_ticks = SDL_GetTicks(); // Update the last key ticks to prevent the game from limiting the FPS
+
     increase_snow_count(&game_ptr->snow, count - game_ptr->snow.snowflake_count);
 }
 
@@ -1056,6 +1065,16 @@ void notify_score_points(void)
     EM_ASM ({
         if (typeof window.updateScore === "function")
             window.updateScore($0, $1);
+    }, game_ptr->left_score, game_ptr->right_score);
+}
+
+void notify_game_over(void)
+{
+    if (game_ptr == NULL) return;
+    EM_ASM({
+        if (typeof window.onGameOver === 'function')
+                window.onGameOver($0, $1);
+
     }, game_ptr->left_score, game_ptr->right_score);
 }
 

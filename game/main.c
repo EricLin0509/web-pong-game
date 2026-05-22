@@ -88,6 +88,78 @@ static void switch_mode(Game *game)
 
 /* ===== Snow Functions ====== */
 
+static bool init_snow_sprite(Snow *snow, SDL_Renderer *renderer)
+{
+    if (snow == NULL || renderer == NULL) return false;
+
+    const int size = 32;
+    SDL_Surface *surface = SDL_CreateSurface(size, size, SDL_PIXELFORMAT_ARGB8888);
+    if (surface == NULL)
+    {
+        fprintf(stderr, ERROR_TEXT " Failed to create snow sprite surface: %s\n", SDL_GetError());
+        return false;
+    }
+
+    // Draw simple circle
+    Uint32 *pixels = surface->pixels;
+    int pitch = surface->pitch;
+    for (int y = 0; y < size; y++)
+    {
+        for (int x = 0; x < size; x++)
+        {
+            float dx = (x - size/2.0f) / (size/2.0f);
+            float dy = (y - size/2.0f) / (size/2.0f);
+            float dist = sqrtf(dx*dx + dy*dy);
+            Uint8 alpha = 0;
+            if (dist < 1.0f) 
+                alpha = (Uint8)((1.0f - dist) * 255.0f); // Gradient from 0 to 255
+
+            Uint32 *pixel = (Uint32*)((Uint8*)pixels + y * pitch + x * 4);
+            *pixel = (alpha << 24) | (255 << 16) | (255 << 8) | 255;
+        }
+    }
+
+    snow->snow_sprite = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_DestroySurface(surface);
+    surface = NULL;
+    if (snow->snow_sprite == NULL)
+    {
+        fprintf(stderr, ERROR_TEXT " Failed to create snow sprite texture: %s\n", SDL_GetError());
+        return false;
+    }
+    return true;
+}
+
+static bool init_snow(Snow *snow, SDL_Renderer *renderer)
+{
+    if (snow == NULL || renderer == NULL) return false;
+    if (!init_snow_sprite(snow, renderer)) return false;
+
+    snow->snow_vertices = SDL_malloc(sizeof(SDL_Vertex) * MAX_SNOWFLAKES * 4);
+    snow->snow_indices = SDL_malloc(sizeof(int) * MAX_SNOWFLAKES * 6);
+    if (!snow->snow_vertices || !snow->snow_indices)
+    {
+        SDL_free(snow->snow_vertices);
+        SDL_free(snow->snow_indices);
+        return false;
+    }
+    // Calculate all snowflake indices because thay are static
+    for (int i = 0; i < MAX_SNOWFLAKES; i++)
+    {
+        int base = i * 4;
+        int idx = i * 6;
+        snow->snow_indices[idx + 0] = base + 0;
+        snow->snow_indices[idx + 1] = base + 1;
+        snow->snow_indices[idx + 2] = base + 2;
+        snow->snow_indices[idx + 3] = base + 1;
+        snow->snow_indices[idx + 4] = base + 3;
+        snow->snow_indices[idx + 5] = base + 2;
+    }
+    snow->num_vertices = 0;
+    snow->num_indices  = 0;
+    return true;
+}
+
 static void init_snowflake(Snowflake *snowflake)
 {
     if (snowflake == NULL) return;
@@ -137,6 +209,8 @@ static void increase_snow_count(Snow *snow, int increase)
         snow->snowflake_count = (snow->snowflake_count + increase) >= 0 ?
             snow->snowflake_count + increase : 0;
 
+    snow->num_vertices = snow->snowflake_count * 4;
+    snow->num_indices = snow->snowflake_count * 6;
 #ifdef __EMSCRIPTEN__
     notify_snow_count_change();
 #endif
@@ -146,8 +220,7 @@ static void update_snow(Snow *snow, float dt)
 {
     static float wind_timer = 0;
     wind_timer += dt;
-    float base_wind = sinf(wind_timer * 0.5f) * 0.3f; // -0.3 ~ 0.3 base wind
-    float wind = base_wind + snow->global_speed; // actual wind speed
+    float wind = sinf(wind_timer * 0.5f) * 0.3f;
 
     for (int i = 0; i < snow->snowflake_count; i++)
     {
@@ -168,53 +241,81 @@ static void update_snow(Snow *snow, float dt)
     }
 }
 
-static void render_snow(SDL_Renderer *renderer, Snow *snow)
+/* Fun fact: This implemenation is pretty similar to the act of PS2 hardware, Emotion Engine (EE, CPU) + Graphics Synthesizer (GS, GPU) */
+static void render_snow(Snow *snow, SDL_Renderer *renderer)
 {
-    int w = WINDOW_WIDTH;
-    int h = WINDOW_HEIGHT;
-    if (!snow->snow_texture)
-        snow->snow_texture = SDL_CreateTexture(renderer,
-            SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, w, h);
+    if (renderer == NULL || snow == NULL) return;
+    if (snow->snow_sprite == NULL) return;
 
-    Uint32 *pixels;
-    int pitch;
-    if (!SDL_LockTexture(snow->snow_texture, NULL, (void**)&pixels, &pitch))
-    {
-        fprintf(stderr, "Lock texture failed: %s\n", SDL_GetError());
-        return;
-    }
+    const int snow_count = snow->snowflake_count;
 
-    memset(pixels, 0, pitch * h);
-    // Draw snowflakes
-    for (int i = 0; i < snow->snowflake_count; i++)
+    /*
+        the triangles look like this:
+        0 ----- 1
+        | \         |
+        |   \       |
+        |     \     |
+        |       \   |
+        2 ----- 3
+
+        the 0, 1, 2, 3 are the vertices
+
+        these vertices are used to build two triangles:
+        triangle 1: 0, 1, 3
+        triangle 2: 0, 3, 2
+
+        They share the (0->3) diagonal and form a rectangle
+        with the same width and height as the snowflake size
+
+        represent in memory: [ [0, 1, 3], [0, 3, 2] ]
+    */
+
+    SDL_Vertex *v = snow->snow_vertices;
+    for (int i = 0; i < snow_count; i++)
     {
         Snowflake *s = &snow->snowflakes[i];
-        int cx = (int)s->x;
-        int cy = (int)s->y;
-        int r = (int)s->size;  // snowflake radius
+        float w = s->size;
+        float x = s->x, y = s->y;
         Uint8 alpha = (Uint8)(s->opacity * 255);
-        // Draw simple circle
-        for (int dy = -r; dy <= r; dy++)
+        SDL_FColor color = { 1.0f, 1.0f, 1.0f, alpha / 255.0f };
+
+        // The positions of the four corners of the snowflake rectangle
+        SDL_FPoint positions[4] = {
+            { x - w, y - w },
+            { x + w, y - w },
+            { x - w, y + w },
+            { x + w, y + w }
+        };
+
+        /*
+            The texture coordinates of the vertices
+            This defines how the texture is mapped onto rectangle
+
+            vertex 0: (0, 0)
+            vertex 1: (1, 0)
+            vertex 2: (0, 1)
+            vertex 3: (1, 1)
+
+            This makes the actual memory look like: 
+                [ [(0, 0), (1, 0), (1, 1)],     // triangle 1
+                  [(0, 0), (1, 1), (0, 1)] ]    // triangle 2
+        */
+        SDL_FPoint uvs[4] = {
+            { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 }
+        };
+
+        for (int j = 0; j < 4; j++)
         {
-            for (int dx = -r; dx <= r; dx++)
-            {
-                if (dx*dx + dy*dy <= r*r)
-                {
-                    int px = cx + dx;
-                    int py = cy + dy;
-                    if (px >= 0 && px < w && py >= 0 && py < h)
-                    {
-                        // White snowflake, alpha can be varied
-                        pixels[py * (pitch/4) + px] = (alpha<<24)|(255<<16)|(255<<8)|255;
-                    }
-                }
-            }
+            v->position = positions[j];
+            v->color = color;
+            v->tex_coord = uvs[j];
+            v++;
         }
     }
 
-    SDL_UnlockTexture(snow->snow_texture);
-    SDL_SetTextureBlendMode(snow->snow_texture, SDL_BLENDMODE_BLEND);
-    SDL_RenderTexture(renderer, snow->snow_texture, NULL, NULL);
+    SDL_RenderGeometry(renderer, snow->snow_sprite,
+                       snow->snow_vertices, snow->num_vertices,
+                       snow->snow_indices,  snow->num_indices);
 }
 
 /* ====== Text Functions ====== */
@@ -616,7 +717,7 @@ static void render(Game *game)
 {
     SDL_RenderClear(game->window_renderer);
 
-    render_snow(game->window_renderer, &game->snow);
+    render_snow(&game->snow, game->window_renderer);
 
     SDL_SetRenderDrawColor(game->window_renderer,
         game->theme->foreground[0],
@@ -800,6 +901,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     /* Initialize ball */
     ball_init(&game.ball, (WINDOW_WIDTH - BALL_SIZE) / 2, (WINDOW_HEIGHT - BALL_SIZE) / 2, BALL_SIZE, BALL_SIZE);
 
+    /* Initialize snow sprite */
+    if (!init_snow(&game.snow, game.window_renderer))
+        return SDL_APP_FAILURE;
+
     /* Initialize theme */
     set_theme(&game);
 
@@ -910,14 +1015,17 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     if (game->window)
         SDL_DestroyWindow(game->window);
 
-    if (game->snow.snow_texture)
-        SDL_DestroyTexture(game->snow.snow_texture);
+    if (game->snow.snow_sprite)
+        SDL_DestroyTexture(game->snow.snow_sprite);
 
     destroy_text_texture(&game->welcome_text);
     destroy_text_texture(&game->welcome_description);
     destroy_text_texture(&game->paused_text);
     destroy_text_texture(&game->game_over_text);
     destroy_text_texture(&game->game_over_description);
+
+    SDL_free(game->snow.snow_vertices);
+    SDL_free(game->snow.snow_indices);
 }
 
 /* Emscripten bindings */

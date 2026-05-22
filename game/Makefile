@@ -20,6 +20,7 @@ wasm_benchmark: $(SRC)
 	$(CC_WASM) $(CFLAGS) $(WASM_CFLAGS) -O3 \
 	-D BENCHMARK_MODE \
 	-sENVIRONMENT=web \
+	-sALLOW_MEMORY_GROWTH=1 \
 	-sEXPORTED_RUNTIME_METHODS="['ccall', 'cwrap', 'setCanvasSize']" \
 	-sEXPORTED_FUNCTIONS="['_main', '_pause_game', '_set_snowflake_count']" \
 	--preload-file roboto.ttf \

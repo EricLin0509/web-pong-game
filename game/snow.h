@@ -18,8 +18,13 @@ typedef struct {
 typedef struct {
     Snowflake snowflakes[MAX_SNOWFLAKES];
     int snowflake_count;
-    float global_speed; // global speed
-    SDL_Texture *snow_texture;
+
+    /* The vertex and index arrays for snowflakes */
+    SDL_Texture *snow_sprite; // A single snowflake texture
+    SDL_Vertex *snow_vertices; // Vertex array for snowflakes
+    int *snow_indices; // Index array for snowflakes
+    int num_vertices;
+    int num_indices;
 } Snow;
 
 #endif // PARTICLE_H

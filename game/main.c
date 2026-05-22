@@ -148,6 +148,28 @@ static bool init_snow(Snow *snow, SDL_Renderer *renderer)
     {
         int base = i * 4;
         int idx = i * 6;
+
+        /*
+            the triangles look like this:
+            0 ----- 1
+            |        /  |
+            |      /    |
+            |    /      |
+            |  /        |
+            2 ----- 3
+
+            the 0, 1, 2, 3 are the vertices
+
+            these vertices are used to build two triangles:
+            triangle 1: 0, 1, 2
+            triangle 2: 1, 3, 2
+
+            They share the (1->2) diagonal and form a rectangle
+            with the same width and height as the snowflake size
+
+            represent in memory: [ [0, 1, 2], [1, 3, 2] ]
+        */
+
         snow->snow_indices[idx + 0] = base + 0;
         snow->snow_indices[idx + 1] = base + 1;
         snow->snow_indices[idx + 2] = base + 2;
@@ -249,27 +271,6 @@ static void render_snow(Snow *snow, SDL_Renderer *renderer)
 
     const int snow_count = snow->snowflake_count;
 
-    /*
-        the triangles look like this:
-        0 ----- 1
-        | \         |
-        |   \       |
-        |     \     |
-        |       \   |
-        2 ----- 3
-
-        the 0, 1, 2, 3 are the vertices
-
-        these vertices are used to build two triangles:
-        triangle 1: 0, 1, 3
-        triangle 2: 0, 3, 2
-
-        They share the (0->3) diagonal and form a rectangle
-        with the same width and height as the snowflake size
-
-        represent in memory: [ [0, 1, 3], [0, 3, 2] ]
-    */
-
     SDL_Vertex *v = snow->snow_vertices;
     for (int i = 0; i < snow_count; i++)
     {
@@ -297,8 +298,8 @@ static void render_snow(Snow *snow, SDL_Renderer *renderer)
             vertex 3: (1, 1)
 
             This makes the actual memory look like: 
-                [ [(0, 0), (1, 0), (1, 1)],     // triangle 1
-                  [(0, 0), (1, 1), (0, 1)] ]    // triangle 2
+                [ [(0, 0), (1, 0), (1, 0)],     // triangle 1
+                  [(1, 0), (1, 1), (0, 1)] ]    // triangle 2
         */
         SDL_FPoint uvs[4] = {
             { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 }

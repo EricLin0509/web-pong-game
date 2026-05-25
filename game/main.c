@@ -860,6 +860,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     /* Initialize window and renderer */
     /* Emscripten no need to set logical presentation */
 #ifdef __EMSCRIPTEN__
+    SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas"); // Limit the keyboard focus to the canvas only
     game.window = SDL_CreateWindow(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
 #else
     game.window = SDL_CreateWindow(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
@@ -1032,6 +1033,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     destroy_text_texture(&game->game_over_text);
     destroy_text_texture(&game->game_over_description);
 
+    TTF_Quit();
+
     SDL_free(game->snow.snow_vertices);
     SDL_free(game->snow.snow_indices);
 }
@@ -1054,7 +1057,9 @@ void set_snowflake_count(int count)
 {
     if (game_ptr == NULL) return;
 
+#ifndef BENCHMARK_MODE
     game_ptr->last_key_ticks = SDL_GetTicks(); // Update the last key ticks to prevent the game from limiting the FPS
+#endif
 
     increase_snow_count(&game_ptr->snow, count - game_ptr->snow.snowflake_count);
 }

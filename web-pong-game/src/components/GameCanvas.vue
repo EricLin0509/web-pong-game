@@ -8,6 +8,9 @@
       <!-- The canvas frame -->
       <div :class="['frame', { 'animate-slide-down': isWasmLoaded }]" ref="frameRef">
         <canvas ref="canvasRef" id="canvas" tabindex="0" @click="canvasRef?.focus()"></canvas>
+        <div v-if="!isCanvasFocused && isGameRunning" class="focus-overlay">
+          ⚡ Click to focus then press SPACE
+        </div>
       </div>
       <!-- Player 2 score -->
       <div :class="['score score-right', { show: isGameRunning, flash: flashRight }]">{{ rightScore }}</div>
@@ -48,6 +51,7 @@ const historyRecords = ref([])
 
 const frameRef = ref(null)
 const canvasRef = ref(null)
+const isCanvasFocused = ref(false)
 
 const leftScore = ref(0)
 const flashLeft = ref(false)
@@ -94,6 +98,17 @@ window.updateSnowflakeCount = (count) => {
 
 function handleVisibilityChange() {
   if (document.hidden && pongModule) {
+    pongModule._pause_game()
+  }
+}
+
+const handleCanvasFocus = () => {
+  isCanvasFocused.value = true
+}
+
+const handleCanvasBlur = () => {
+  isCanvasFocused.value = false
+  if (pongModule) {
     pongModule._pause_game()
   }
 }
@@ -172,6 +187,9 @@ onMounted(async () => {
   window.addEventListener('resize', updateFrameStyles)
   document.addEventListener('visibilitychange', handleVisibilityChange)
 
+  canvasRef.value.addEventListener('focus', handleCanvasFocus)
+  canvasRef.value.addEventListener('blur', handleCanvasBlur)
+
   pongModule = await loadWasm(canvasRef.value)
   isWasmLoaded.value = true
 
@@ -191,13 +209,44 @@ onBeforeUnmount(() => {
   delete window.updateScore
   delete window.onGameOver
   delete window.updateSnowflakeCount
+
   window.removeEventListener('resize', updateFrameStyles)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  canvasRef.value?.removeEventListener('focus', handleCanvasFocus)
+  canvasRef.value?.removeEventListener('blur', handleCanvasBlur)
   if (rafId) cancelAnimationFrame(rafId)
 })
 </script>
 
 <style scoped>
+.canvas-container {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  height: 100%;
+}
+
+.focus-overlay {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  padding: 10px 24px;
+  border-radius: 40px;
+  font-family: monospace;
+  font-size: 16px;
+  font-weight: bold;
+  color: white;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.2);
+  letter-spacing: 0.5px;
+}
+
 .game-wrapper {
   display: flex;
   flex-direction: column;

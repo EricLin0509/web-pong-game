@@ -74,17 +74,9 @@ static void switch_mode(Game *game)
     if (game == NULL) return;
     if (game->state != GAME_INIT) return; // The game mode can only be switched when the game is in the init state
 
-    switch (game->mode)
-    {
-        case MODE_CLASSIC:
-            game->mode = MODE_INFINITE;
-            game->score_to_win = INFINITE_WIN_SCORE;
-            break;
-        case MODE_INFINITE:
-            game->mode = MODE_CLASSIC;
-            game->score_to_win = CLASSIC_WIN_SCORE;
-            break;
-    }
+    game->mode ^= MODE_INFINITE; // Toggle between classic and infinite mode
+
+    game->score_to_win = (game->mode == MODE_INFINITE) ? INFINITE_WIN_SCORE : CLASSIC_WIN_SCORE;
 }
 
 /* ===== Snow Functions ====== */

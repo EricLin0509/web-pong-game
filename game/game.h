@@ -21,8 +21,8 @@ typedef enum {
 } GameState;
 
 typedef enum {
-    MODE_CLASSIC,
-    MODE_INFINITE
+    MODE_CLASSIC = 0,
+    MODE_INFINITE = 1,
 } GameMode;
 
 typedef struct {

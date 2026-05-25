@@ -30,6 +30,15 @@
       />
     </div>
   </div>
+  <div ref="introRef" class="game-intro" :class="{ visible: introVisible }">
+    <div class="intro-content">
+      <h2>🎮 About Pong</h2>
+      <p>
+        Pong is a 1972 sports video game developed and published by Atari, Inc. for arcades. It was created by Allan Alcorn as a training exercise assigned to him by Atari co-founder Nolan Bushnell. Bushnell and Atari co-founder Ted Dabney were so surprised by the quality of Alcorn's work that they decided to manufacture the game. Bushnell based the game's concept on an electronic ping-pong game included on the Magnavox Odyssey, the first home video game console; in response, Magnavox later sued Atari for patent infringement.
+      </p>
+      <h6>Source: <a href="https://en.wikipedia.org/wiki/Pong" target="_blank">Wikipedia</a></h6>
+    </div>
+  </div>
   <div :class="['history-panel', { 'animate-slide-right': isWasmLoaded }]" v-if="historyRecords.length">
     <h3>🏆 Recent scores (Classic)</h3>
     <ul>
@@ -60,6 +69,10 @@ const flashRight = ref(false)
 
 const isWasmLoaded = ref(false)
 const isGameRunning = ref(false)
+
+const introRef = ref(null)
+const introVisible = ref(false)
+let observer = null
 
 // FPS display
 const fps = ref(0)
@@ -198,6 +211,21 @@ onMounted(async () => {
     pongModule._set_snowflake_count(snowCount.value)
   }
 
+  if (introRef.value) {
+    observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            introVisible.value = true
+            if (observer && introRef.value) observer.unobserve(introRef.value)
+          }
+        })
+      },
+      { threshold: 0.3 }
+    )
+    observer.observe(introRef.value)
+  }
+
   // Initialize FPS
   updateFPS()
 
@@ -215,10 +243,17 @@ onBeforeUnmount(() => {
   canvasRef.value?.removeEventListener('focus', handleCanvasFocus)
   canvasRef.value?.removeEventListener('blur', handleCanvasBlur)
   if (rafId) cancelAnimationFrame(rafId)
+  if (observer) observer.disconnect()
 })
 </script>
 
 <style scoped>
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
 .canvas-container {
   position: relative;
   display: inline-block;
@@ -254,6 +289,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 100%;
   height: 100vh;
+  flex-shrink: 0;
 }
 
 .control-bar {
@@ -367,6 +403,52 @@ canvas {
   image-rendering: crisp-edges;
 }
 
+.game-intro {
+  background: linear-gradient(135deg, #1a2a3a, #0f1a24);
+  color: #eef4ff;
+  padding: 40px 20px;
+  font-family: system-ui, 'Segoe UI', monospace;
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+  border-top: 2px solid #ffaa66;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.game-intro.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.intro-content {
+  max-width: 900px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.intro-content h2 {
+  color: #ffaa66;
+  margin-top: 0;
+  font-size: 2rem;
+}
+
+.intro-content p {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.intro-content h6 {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  color: #ffaa66;
+}
+
+.intro-content h6 a {
+  color: #a1cbf3;
+  text-decoration: none;
+}
+
 .history-panel {
   position: fixed;
   bottom: 20px;
@@ -381,23 +463,28 @@ canvas {
   border-left: 4px solid #ffaa66;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
+
 .history-panel h3 {
   margin: 0 0 8px 0;
   font-size: 16px;
   color: #ffaa66;
 }
+
 .history-panel ul {
   margin: 0;
   padding-left: 20px;
 }
+
 .history-panel li {
   font-size: 14px;
   line-height: 1.5;
 }
+
 .time {
   font-size: 11px;
   opacity: 0.7;
 }
+
 .clear-btn {
   margin-top: 8px;
   background: #3a4a6a;
@@ -408,6 +495,7 @@ canvas {
   cursor: pointer;
   font-size: 12px;
 }
+
 .clear-btn:hover {
   background: #ffaa66;
   color: #0a0f1a;

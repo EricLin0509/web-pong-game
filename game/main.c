@@ -35,8 +35,7 @@ Game *game_ptr = NULL; // Expose the game struct to WebAssembly
 void pause_game(void);
 void set_snowflake_count(int count);
 void notify_score_points(void);
-void notify_game_over(void);
-void is_game_running(void);
+void notify_game_state(void);
 void report_wasm_frame(void);
 void notify_snow_count_change(void);
 #endif
@@ -802,13 +801,7 @@ static void score_points(Game *game, bool is_left_score)
         game->max_score = *score;
 
     if (*score == game->score_to_win)
-    {
         game->state = GAME_OVER;
-
-#ifdef __EMSCRIPTEN__
-        notify_game_over();
-#endif
-    }
 
 #ifdef __EMSCRIPTEN__
     notify_score_points();
@@ -883,7 +876,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     bool font_loaded = true;
 
     font_loaded &= create_text_texture(&game.welcome_text, FONT_PATH, "Welcome to Pong", FONT_SIZE, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(&game.welcome_description, FONT_PATH, "Press [space] to start", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
+
+#ifdef __EMSCRIPTEN__
+    font_loaded &= create_text_texture(&game.welcome_description, FONT_PATH, "Press SPACE or click start button", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
+#else
+    font_loaded &= create_text_texture(&game.welcome_description, FONT_PATH, "Press [SPACE] to start", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
+#endif
     font_loaded &= create_text_texture(&game.current_mode_classic, FONT_PATH, "Classic Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
     font_loaded &= create_text_texture(&game.current_mode_infinite, FONT_PATH, "Infinite Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
 
@@ -911,6 +909,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     /* Notify the initial score */
 #ifdef __EMSCRIPTEN__
+    notify_game_state();
     notify_score_points();
 #endif
 
@@ -942,7 +941,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     render(game);
 
 #ifdef __EMSCRIPTEN__
-    is_game_running();
+    notify_game_state();
     report_wasm_frame();
 #endif
 
@@ -1036,12 +1035,56 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 #ifdef __EMSCRIPTEN__
 
 EMSCRIPTEN_KEEPALIVE
+void start_game(void)
+{
+    if (game_ptr && game_ptr->state == GAME_INIT)
+        game_ptr->state = GAME_RUNNING;
+}
+
+EMSCRIPTEN_KEEPALIVE
 void pause_game(void)
 {
     if (game_ptr == NULL) return;
 
     if (game_ptr->state == GAME_RUNNING)
         game_ptr->state = GAME_PAUSED;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void resume_game(void)
+{
+    if (game_ptr == NULL) return;
+
+    if (game_ptr->state != GAME_PAUSED) return;
+
+    game_ptr->resume_delay_time = 0.25f;
+    game_ptr->state = GAME_RUNNING;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void restart_game(void)
+{
+    if (game_ptr && game_ptr->state == GAME_OVER)
+    {
+        game_reset(game_ptr);
+        game_ptr->state = GAME_RUNNING;
+    }
+}
+
+EMSCRIPTEN_KEEPALIVE
+void goto_menu(void)
+{
+    if (game_ptr == NULL) return;
+
+    game_reset(game_ptr);
+    game_ptr->state = GAME_INIT;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void toggle_mode(void)
+{
+    if (game_ptr && game_ptr->state == GAME_INIT)
+        switch_mode(game_ptr);
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -1056,6 +1099,12 @@ void set_snowflake_count(int count)
     increase_snow_count(&game_ptr->snow, count - game_ptr->snow.snowflake_count);
 }
 
+EMSCRIPTEN_KEEPALIVE
+int get_game_state(void)
+{
+    return game_ptr ? game_ptr->state : -1;
+}
+
 void notify_score_points(void)
 {
     if (game_ptr == NULL) return;
@@ -1065,23 +1114,14 @@ void notify_score_points(void)
     }, game_ptr->left_score, game_ptr->right_score);
 }
 
-void notify_game_over(void)
+void notify_game_state(void)
 {
     if (game_ptr == NULL) return;
+
     EM_ASM({
-        if (typeof window.onGameOver === 'function')
-                window.onGameOver($0, $1);
-
-    }, game_ptr->left_score, game_ptr->right_score);
-}
-
-void is_game_running(void)
-{
-    if (game_ptr == NULL) return;
-    EM_ASM ({
-        if (typeof window.isGameRunning === "function")
-            window.isGameRunning($0);
-    }, game_ptr->state == GAME_RUNNING || game_ptr->state == GAME_PAUSED);
+        if (typeof window.onGameStateChange === 'function')
+            window.onGameStateChange($0);
+    }, game_ptr->state);
 }
 
 void report_wasm_frame(void)

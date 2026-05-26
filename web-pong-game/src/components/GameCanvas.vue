@@ -4,16 +4,24 @@
       { 'fps-low': fps < 60 && fps >= 30, 'fps-very-low': fps < 30 }]">FPS: {{ fps }}</div>
     <div class="screen-container">
       <!-- Player 1 score -->
-      <div :class="['score score-left', { show: isGameRunning, flash: flashLeft }]">{{ leftScore }}</div>
+      <div :class="['score score-left', { show: gameState === 1 || gameState === 2, flash: flashLeft }]">{{ leftScore }}</div>
       <!-- The canvas frame -->
-      <div :class="['frame', { 'animate-slide-down': isWasmLoaded }]" ref="frameRef">
-        <canvas ref="canvasRef" id="canvas" tabindex="0" @click="canvasRef?.focus()"></canvas>
-        <div v-if="!isCanvasFocused && isGameRunning" class="focus-overlay">
-          ⚡ Click to focus then press SPACE
+        <div :class="['frame', { 'animate-slide-down': isWasmLoaded }]" ref="frameRef">
+          <canvas ref="canvasRef" id="canvas" tabindex="0" @click="canvasRef?.focus()"></canvas>
+          <div v-if="!isCanvasFocused && (gameState === 1 || gameState === 2)" class="focus-overlay">
+            ⚠️ Canvas is not focused! ⚠️
+          </div>
+
+          <div class="button-bar" v-if="isWasmLoaded">
+            <button v-if="gameState === 0" @click="startGame" class="game-btn">▶ Start Game</button>
+            <button v-if="gameState === 0" @click="toggleMode" class="game-btn">🔄 Switch Mode</button>
+            <button v-if="gameState === 2" @click="resumeGame" class="game-btn">➡️ Resume Game</button>
+            <button v-if="gameState === 2 || gameState === 3" @click="gotoMenu" class="game-btn">↩️ Back to Menu</button>
+            <button v-if="gameState === 3" @click="restartGame" class="game-btn">🔄 Restart Game</button>
+          </div>
         </div>
-      </div>
       <!-- Player 2 score -->
-      <div :class="['score score-right', { show: isGameRunning, flash: flashRight }]">{{ rightScore }}</div>
+      <div :class="['score score-right', { show: gameState === 1 || gameState === 2, flash: flashRight }]">{{ rightScore }}</div>
     </div>
 
     <div :class="['control-bar', { 'animate-slide-up': isWasmLoaded }]">
@@ -68,7 +76,7 @@ const rightScore = ref(0)
 const flashRight = ref(false)
 
 const isWasmLoaded = ref(false)
-const isGameRunning = ref(false)
+const gameState = ref(-1)  // 0:INIT, 1:RUNNING, 2:PAUSED, 3:OVER
 
 const introRef = ref(null)
 const introVisible = ref(false)
@@ -112,6 +120,43 @@ window.updateSnowflakeCount = (count) => {
 function handleVisibilityChange() {
   if (document.hidden && pongModule) {
     pongModule._pause_game()
+  }
+}
+
+window.onGameStateChange = (state) => {
+  gameState.value = state
+}
+
+function startGame() {
+  if (pongModule && pongModule._start_game) {
+    pongModule._start_game()
+    canvasRef.value?.focus()
+  }
+}
+
+function resumeGame() {
+  if (pongModule && pongModule._resume_game) {
+    pongModule._resume_game()
+    canvasRef.value?.focus()
+  }
+}
+
+function restartGame() {
+  if (pongModule && pongModule._restart_game) {
+    pongModule._restart_game()
+    canvasRef.value?.focus()
+  }
+}
+
+function gotoMenu() {
+  if (pongModule && pongModule._goto_menu) {
+    pongModule._goto_menu()
+  }
+}
+
+function toggleMode() {
+  if (pongModule && pongModule._toggle_mode) {
+    pongModule._toggle_mode()
   }
 }
 
@@ -187,10 +232,6 @@ onMounted(async () => {
 
     leftScore.value = left
     rightScore.value = right
-  }
-
-  window.isGameRunning = (isRunning) => {
-    isGameRunning.value = isRunning
   }
 
   window.onGameOver = (left, right) => {
@@ -391,6 +432,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 20px rgba(255,255,255,0.5);
   line-height: 0;
   background-color: #092427;
+  position: relative;
 }
 
 canvas {
@@ -401,6 +443,38 @@ canvas {
   max-height: 75vh;
   object-fit: contain;
   image-rendering: crisp-edges;
+}
+
+.button-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  z-index: 20;
+  pointer-events: auto;
+}
+
+.game-btn {
+  background: rgba(58, 74, 106, 0.75);
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  font-family: monospace;
+  font-size: 14px;
+  padding: 6px 18px;
+  border-radius: 40px;
+  cursor: pointer;
+  transition: 0.2s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.game-btn:hover {
+  background: #ffaa66;
+  color: #0a0f1a;
+  border-color: #ffaa66;
 }
 
 .game-intro {

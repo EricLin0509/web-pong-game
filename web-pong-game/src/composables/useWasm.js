@@ -4,7 +4,12 @@ export function loadWasm(canvas) {
       canvas: canvas,
       onRuntimeInitialized: () => {
         const module = window.Module;
+        module._start_game = module.cwrap('start_game', null, []);
         module._pause_game = module.cwrap('pause_game', null, []);
+        module._resume_game = module.cwrap('resume_game', null, []);
+        module._restart_game = module.cwrap('restart_game', null, []);
+        module._toggle_mode = module.cwrap('toggle_mode', null, []);
+        module._goto_menu = module.cwrap('goto_menu', null, []);
 
         console.log('☑️ Pong Module is set!');
         resolve(window.Module);

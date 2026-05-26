@@ -5,9 +5,9 @@
 #include <SDL3/SDL_main.h>
 
 #define BALL_SIZE 20.0f
-#define INITIAL_SPEED_PER_SEC ((float)rand() / (float)RAND_MAX * 1.0f + 150.0f) // [150, 250]
+#define INITIAL_SPEED_PER_SEC ((float)rand() / (float)RAND_MAX * 1.0f + 250.0f) // [300, 400]
 #define JITTER_PER_SEC ((float)rand() / (float)RAND_MAX * 0.1f + 10.0f) // [10, 20]
-#define MAX_SPEED 8.0f
+#define MAX_SPEED 800.0f
 #define SPEED_UP_RATE 1.05f
 #define SHOUD_MOVE_REVERSE ((rand() & 1) == 0)
 

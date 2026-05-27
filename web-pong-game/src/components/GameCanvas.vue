@@ -309,7 +309,7 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
   background: rgba(0, 0, 0, 0.85);
   backdrop-filter: blur(8px);
-  padding: 10px 24px;
+  padding: 14px 24px;
   border-radius: 40px;
   font-family: monospace;
   font-size: 16px;
@@ -447,7 +447,7 @@ canvas {
 
 .button-bar {
   position: absolute;
-  bottom: 16px;
+  bottom: 20px;
   left: 0;
   right: 0;
   display: flex;
@@ -464,7 +464,7 @@ canvas {
   color: white;
   font-family: monospace;
   font-size: 14px;
-  padding: 6px 18px;
+  padding: 12px 28px;
   border-radius: 40px;
   cursor: pointer;
   transition: 0.2s;
@@ -565,7 +565,7 @@ canvas {
   border: none;
   color: white;
   border-radius: 20px;
-  padding: 4px 12px;
+  padding: 6px 14px;
   cursor: pointer;
   font-size: 12px;
 }

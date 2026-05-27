@@ -1,4 +1,8 @@
+#include <math.h>
+
 #include "ball.h"
+
+#define MAX_BOUNCE_ANGLE 300.0f 
 
 void ball_init(Ball *ball, float x, float y, int width, int height)
 {
@@ -10,7 +14,7 @@ void ball_init(Ball *ball, float x, float y, int width, int height)
     ball->rect.h = height;
     
     ball->speed_x = (SHOUD_MOVE_REVERSE) ? -INITIAL_SPEED_PER_SEC : INITIAL_SPEED_PER_SEC;
-    ball->speed_y = (SHOUD_MOVE_REVERSE) ? -INITIAL_SPEED_PER_SEC : INITIAL_SPEED_PER_SEC;
+    ball->speed_y = (SHOUD_MOVE_REVERSE) ? -INITIAL_SPEED_PER_SEC + 100.0f : INITIAL_SPEED_PER_SEC - 100.0f;
 }
 
 void reset_ball(Ball *ball, bool left_serve)
@@ -24,28 +28,18 @@ void reset_ball(Ball *ball, bool left_serve)
     ball->speed_y = (SHOUD_MOVE_REVERSE) ? INITIAL_SPEED_PER_SEC : -INITIAL_SPEED_PER_SEC;
 }
 
-void speed_up_ball(Ball *ball)
-{
-    if (ball == NULL) return;
-
-    if (ball->speed_x <= MAX_SPEED)
-        ball->speed_x *= SPEED_UP_RATE;
-    if (ball->speed_y <= MAX_SPEED)
-        ball->speed_y *= SPEED_UP_RATE;
-}
-
 CollisionType ball_collision(Ball *ball, Paddle *left_paddle, Paddle *right_paddle,
                            uint32_t col_min_x, uint32_t col_max_x, uint32_t col_min_y, uint32_t col_max_y, float dt)
 {
     if (ball == NULL || left_paddle == NULL || right_paddle == NULL) return COLLISION_NONE;
 
-    // First handle the score points
+    // Score points
     if (ball->rect.x < col_min_x)
         return COLLISION_LEFT;
     else if (ball->rect.x > col_max_x - ball->rect.w)
         return COLLISION_RIGHT;
 
-    // Bounce off the top and bottom walls
+    // Wall collision
     float new_y = ball->rect.y + ball->speed_y * dt;
     if (new_y < col_min_y || new_y > (col_max_y - ball->rect.h))
     {
@@ -53,7 +47,7 @@ CollisionType ball_collision(Ball *ball, Paddle *left_paddle, Paddle *right_padd
         new_y = (new_y < col_min_y) ? col_min_y : (col_max_y - ball->rect.h);
     }
 
-    // Predict the ball's next position
+    // Predict next position
     float new_x = ball->rect.x + ball->speed_x * dt;
     SDL_FRect next_rect = { new_x, new_y, ball->rect.w, ball->rect.h };
 
@@ -61,12 +55,31 @@ CollisionType ball_collision(Ball *ball, Paddle *left_paddle, Paddle *right_padd
 
     if (SDL_HasRectIntersectionFloat(&next_rect, &(chosen_paddle->paddle_rect)))
     {
-        ball->speed_x = -(ball->speed_x + JITTER_PER_SEC);
+        float ball_center_y = ball->rect.y + ball->rect.h / 2.0f;
+        float paddle_center_y = chosen_paddle->paddle_rect.y + chosen_paddle->paddle_rect.h / 2.0f;
+        float hit_pos = (ball_center_y - paddle_center_y) / (chosen_paddle->paddle_rect.h / 2.0f);
+        // Limit the hit position to [-1, 1] for better control
+        if (hit_pos > 1.0f) hit_pos = 1.0f;
+        if (hit_pos < -1.0f) hit_pos = -1.0f;
+
+        /*
+            Calculate the new speed based on the hit position and the paddle's height.
+            The hit position is used to determine the angle of the bounce.
+            The paddle's height is used to limit the speed of the bounce.
+            The horizontal speed is also jittered to make the ball more realistic.
+        */
+        ball->speed_x = -ball->speed_x;
+        // Speed up the horizontal speed
+        if (fabsf(ball->speed_x) < MAX_SPEED)
+            ball->speed_x = ball->speed_x > 0 ? ball->speed_x + JITTER_PER_SEC : ball->speed_x - JITTER_PER_SEC;
+
+        ball->speed_y = hit_pos * MAX_BOUNCE_ANGLE;
+
+        // Adjust the ball position to prevent stuck in the paddle
         if (ball->speed_x > 0)
             new_x = chosen_paddle->paddle_rect.x + chosen_paddle->paddle_rect.w;
         else
             new_x = chosen_paddle->paddle_rect.x - ball->rect.w;
-        speed_up_ball(ball);
     }
 
     // Apply the new position

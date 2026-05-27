@@ -302,7 +302,16 @@ onBeforeUnmount(() => {
 })
 </script>
 
+<style>
+:root {
+  --panel-bg: rgba(16, 36, 60, 0.9);
+  --panel-bg-hover: rgba(16, 36, 60, 0.95);
+  --btn-bg: rgba(20, 44, 70, 0.92);
+}
+</style>
+
 <style scoped>
+
 .app-container {
   min-height: 100vh;
   display: flex;
@@ -321,7 +330,6 @@ onBeforeUnmount(() => {
   top: 16px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.85);
   backdrop-filter: blur(8px);
   padding: 14px 24px;
   border-radius: 40px;
@@ -349,7 +357,6 @@ onBeforeUnmount(() => {
 
 .control-bar {
   margin-bottom: 15px;
-  background: rgba(0,0,0,0.6);
   padding: 8px 20px;
   border-radius: 30px;
   backdrop-filter: blur(5px);
@@ -472,13 +479,13 @@ canvas {
 }
 
 .game-btn {
-  background: rgba(58, 74, 106, 0.75);
+  background: var(--btn-bg);
   backdrop-filter: blur(5px);
   border: 1px solid rgba(255, 255, 255, 0.3);
   color: white;
   font-family: monospace;
-  font-size: 14px;
-  padding: 12px 28px;
+  font-size: clamp(10px, 2vw, 14px);
+  padding: clamp(6px, 2vw, 12px) clamp(12px, 4vw, 28px);
   border-radius: 40px;
   cursor: pointer;
   transition: 0.2s;
@@ -539,77 +546,127 @@ canvas {
 
 .keyboard-hint {
   position: fixed;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 20px;
   left: 20px;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  border-radius: 16px;
-  padding: 12px 20px;
+  backdrop-filter: blur(10px);
+  border-radius: 4px;
   font-family: monospace;
   color: #ccddee;
-  min-width: 220px;
-  border-left: 4px solid #5a9eff;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  cursor: pointer;
   z-index: 100;
+  border-left: 4px solid #5a9eff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.keyboard-hint:hover {
+  width: 260px;
+  height: auto;
+  border-radius: 12px;
+  border-left: 12px solid #5a9eff;
+  padding: 12px 20px;
+  display: block;
 }
 
 .keyboard-hint h3 {
-  margin: 0 0 8px 0;
-  font-size: 16px;
   color: #5a9eff;
 }
 
+.keyboard-hint h3,
 .keyboard-hint ul {
-  margin: 0;
+  display: none;
+}
+
+.keyboard-hint:hover h3,
+.keyboard-hint:hover ul {
+  display: block;
+}
+
+.keyboard-hint::before {
+  content: "⌨️";
+  font-size: 28px;
+  line-height: 1;
+}
+
+.keyboard-hint:hover::before {
+  display: none;
+}
+
+.keyboard-hint ul {
   padding-left: 20px;
+  margin: 8px 0;
 }
 
-.keyboard-hint li {
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.keyboard-hint kbd {
-  background: #2a3a4a;
-  border-radius: 6px;
-  padding: 2px 6px;
-  font-family: monospace;
-  font-weight: bold;
-  color: #ffaa66;
-  margin: 0 2px;
-  font-size: 12px;
+.history-panel ul {
+  padding-left: 20px;
+  margin: 8px 0;
 }
 
 .history-panel {
   position: fixed;
-  bottom: 20px;
+  top: 100px;
   left: 20px;
-  background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(8px);
-  border-radius: 16px;
-  padding: 12px 20px;
+  backdrop-filter: blur(10px);
+  border-radius: 4px;
   font-family: monospace;
   color: #ccddee;
-  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  cursor: pointer;
+  z-index: 100;
   border-left: 4px solid #ffaa66;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.history-panel:hover {
+  width: 260px;
+  height: auto;
+  border-radius: 12px;
+  border-left: 12px solid #ffaa66;
+  padding: 12px 20px;
+  display: block;
 }
 
 .history-panel h3 {
-  margin: 0 0 8px 0;
-  font-size: 16px;
   color: #ffaa66;
 }
 
-.history-panel ul {
-  margin: 0;
-  padding-left: 20px;
+.history-panel h3,
+.history-panel ul,
+.history-panel .clear-btn {
+  display: none;
 }
 
-.history-panel li {
-  font-size: 14px;
-  line-height: 1.5;
+.history-panel:hover h3,
+.history-panel:hover ul,
+.history-panel:hover .clear-btn {
+  display: block;
+}
+
+.history-panel:hover ul {
+  display: block;
+  margin: 8px 0;
+}
+
+.history-panel::before {
+  content: "🏆";
+  font-size: 28px;
+  line-height: 1;
+}
+
+.history-panel:hover::before {
+  display: none;
 }
 
 .time {
@@ -631,6 +688,46 @@ canvas {
 .clear-btn:hover {
   background: #ffaa66;
   color: #0a0f1a;
+}
+
+.history-panel:hover,
+.keyboard-hint:hover {
+  z-index: 10000;
+}
+
+.keyboard-hint h3,
+.history-panel h3,
+.keyboard-hint li,
+.history-panel li {
+  font-size: 14px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+kbd {
+  background: #2a3a4a;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-family: monospace;
+  font-weight: bold;
+  color: #ffaa66;
+  margin: 0 2px;
+  font-size: 0.9em;
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.1);
+  display: inline-block;
+}
+
+.control-bar,
+.history-panel,
+.keyboard-hint,
+.focus-overlay {
+  background: var(--panel-bg);
+}
+
+.control-bar:hover,
+.history-panel:hover,
+.keyboard-hint:hover {
+  background: var(--panel-bg-hover);
 }
 
 /* Animation */

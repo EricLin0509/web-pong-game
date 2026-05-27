@@ -7,6 +7,8 @@
 #define MAX_SNOWFLAKES 8000
 #endif
 
+#include <SDL3/SDL.h>
+
 typedef struct {
     float x, y; // position
     float speed; // fall speed
@@ -26,5 +28,13 @@ typedef struct {
     int num_vertices;
     int num_indices;
 } Snow;
+
+bool init_snow(Snow *snow, SDL_Renderer *renderer);
+
+void increase_snow_count(Snow *snow, int increase, uint32_t w, uint32_t h);
+
+void update_snow(Snow *snow, uint32_t w, uint32_t h, float dt);
+
+void render_snow(Snow *snow, SDL_Renderer *renderer);
 
 #endif // PARTICLE_H

@@ -1,12 +1,9 @@
 #include <stdio.h>
 #include <time.h>
-#include <stdint.h>
-#include <math.h>
 #include <stdbool.h>
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL_main.h>
-#include <SDL3/SDL.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -34,10 +31,10 @@ Game *game_ptr = NULL; // Expose the game struct to WebAssembly
 
 void pause_game(void);
 void set_snowflake_count(int count);
+void notify_snow_count_change(void);
 void notify_score_points(void);
 void notify_game_state(void);
 void report_wasm_frame(void);
-void notify_snow_count_change(void);
 #endif
 
 /* ===== Theme Functions ====== */
@@ -68,6 +65,7 @@ static void set_theme(Game *game)
 }
 
 /* ===== Mode switch functions ====== */
+
 static void switch_mode(Game *game)
 {
     if (game == NULL) return;
@@ -76,436 +74,6 @@ static void switch_mode(Game *game)
     game->mode ^= MODE_INFINITE; // Toggle between classic and infinite mode
 
     game->score_to_win = (game->mode == MODE_INFINITE) ? INFINITE_WIN_SCORE : CLASSIC_WIN_SCORE;
-}
-
-/* ===== Snow Functions ====== */
-
-static bool init_snow_sprite(Snow *snow, SDL_Renderer *renderer)
-{
-    if (snow == NULL || renderer == NULL) return false;
-
-    const int size = 32;
-    SDL_Surface *surface = SDL_CreateSurface(size, size, SDL_PIXELFORMAT_ARGB8888);
-    if (surface == NULL)
-    {
-        fprintf(stderr, ERROR_TEXT " Failed to create snow sprite surface: %s\n", SDL_GetError());
-        return false;
-    }
-
-    // Draw simple circle
-    Uint32 *pixels = surface->pixels;
-    int pitch = surface->pitch;
-    for (int y = 0; y < size; y++)
-    {
-        for (int x = 0; x < size; x++)
-        {
-            float dx = (x - size/2.0f) / (size/2.0f);
-            float dy = (y - size/2.0f) / (size/2.0f);
-            float dist = sqrtf(dx*dx + dy*dy);
-            Uint8 alpha = 0;
-            if (dist < 1.0f) 
-                alpha = (Uint8)((1.0f - dist) * 255.0f); // Gradient from 0 to 255
-
-            Uint32 *pixel = (Uint32*)((Uint8*)pixels + y * pitch + x * 4);
-            *pixel = (alpha << 24) | (255 << 16) | (255 << 8) | 255;
-        }
-    }
-
-    snow->snow_sprite = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_DestroySurface(surface);
-    surface = NULL;
-    if (snow->snow_sprite == NULL)
-    {
-        fprintf(stderr, ERROR_TEXT " Failed to create snow sprite texture: %s\n", SDL_GetError());
-        return false;
-    }
-    return true;
-}
-
-static bool init_snow(Snow *snow, SDL_Renderer *renderer)
-{
-    if (snow == NULL || renderer == NULL) return false;
-    if (!init_snow_sprite(snow, renderer)) return false;
-
-    snow->snow_vertices = SDL_malloc(sizeof(SDL_Vertex) * MAX_SNOWFLAKES * 4);
-    snow->snow_indices = SDL_malloc(sizeof(int) * MAX_SNOWFLAKES * 6);
-    if (!snow->snow_vertices || !snow->snow_indices)
-    {
-        SDL_free(snow->snow_vertices);
-        SDL_free(snow->snow_indices);
-        return false;
-    }
-    // Calculate all snowflake indices because thay are static
-    for (int i = 0; i < MAX_SNOWFLAKES; i++)
-    {
-        int base = i * 4;
-        int idx = i * 6;
-
-        /*
-            the triangles look like this:
-            0 ----- 1
-            |        /  |
-            |      /    |
-            |    /      |
-            |  /        |
-            2 ----- 3
-
-            the 0, 1, 2, 3 are the vertices
-
-            these vertices are used to build two triangles:
-            triangle 1: 0, 1, 2
-            triangle 2: 1, 3, 2
-
-            They share the (1->2) diagonal and form a rectangle
-            with the same width and height as the snowflake size
-
-            represent in memory: [ [0, 1, 2], [1, 3, 2] ]
-        */
-
-        snow->snow_indices[idx + 0] = base + 0;
-        snow->snow_indices[idx + 1] = base + 1;
-        snow->snow_indices[idx + 2] = base + 2;
-        snow->snow_indices[idx + 3] = base + 1;
-        snow->snow_indices[idx + 4] = base + 3;
-        snow->snow_indices[idx + 5] = base + 2;
-    }
-    snow->num_vertices = 0;
-    snow->num_indices  = 0;
-    return true;
-}
-
-static void init_snowflake(Snowflake *snowflake)
-{
-    if (snowflake == NULL) return;
-
-        /* Randomly position */
-        snowflake->x = (float)(rand() % WINDOW_WIDTH);
-        snowflake->y = (float)(rand() % WINDOW_HEIGHT);
-
-        /* Randomly speed, size, opacity */
-        snowflake->speed = 0.5f + (rand() % 100) / 100.0f; // 0.5~1.5
-        snowflake->wind = 0.0f;
-        snowflake->size = 1.0f + (rand() % 200) / 100.0f; // 1~3
-        snowflake->opacity = 0.5f + (rand() % 50) / 100.0f; // 0.5~1.0
-}
-
-/* Increment update the snowflake array from start to end */
-static void init_snowflake_inc(Snowflake *snowflake_start_ptr, Snowflake *snowflake_end_ptr)
-{
-    if (snowflake_start_ptr == NULL || snowflake_end_ptr == NULL
-        || snowflake_start_ptr >= snowflake_end_ptr) return;
-
-    Snowflake *update_region = snowflake_start_ptr;
-    while (update_region <= snowflake_end_ptr)
-    {
-        init_snowflake(update_region);
-        update_region++;
-    }
-}
-
-static void increase_snow_count(Snow *snow, int increase)
-{
-    if (snow == NULL || increase == 0) return;
-
-    if (snow->snowflake_count < MAX_SNOWFLAKES && increase > 0)
-    {
-        int old_count = snow->snowflake_count;
-
-        snow->snowflake_count = (snow->snowflake_count + increase) <= MAX_SNOWFLAKES ?
-            snow->snowflake_count + increase : MAX_SNOWFLAKES;
-
-        Snowflake *start = snow->snowflakes + old_count;
-        Snowflake *end = snow->snowflakes + snow->snowflake_count - 1;
-        init_snowflake_inc(start, end);
-    }
-
-    if (snow->snowflake_count > 0 && increase < 0)
-        snow->snowflake_count = (snow->snowflake_count + increase) >= 0 ?
-            snow->snowflake_count + increase : 0;
-
-    snow->num_vertices = snow->snowflake_count * 4;
-    snow->num_indices = snow->snowflake_count * 6;
-#ifdef __EMSCRIPTEN__
-    notify_snow_count_change();
-#endif
-}
-
-static void update_snow(Snow *snow, float dt)
-{
-    static float wind_timer = 0;
-    wind_timer += dt;
-    float wind = sinf(wind_timer * 0.5f) * 0.3f;
-
-    for (int i = 0; i < snow->snowflake_count; i++)
-    {
-        Snowflake *s = &snow->snowflakes[i];
-        // Basic movement
-        s->y += s->speed * 60.0f * dt;
-        s->x += wind * 60.0f * dt;
-        // horizontal jitter
-        s->x += sinf(s->y * 0.1f + i) * 0.2f * dt * 60.0f;
-        // boundary loop: roll out of bottom or top, wrap around
-        if (s->y > WINDOW_HEIGHT + 10)
-        {
-            s->y = -10.0f;
-            s->x = (float)(rand() % WINDOW_WIDTH);
-        }
-        if (s->x < -10) s->x += WINDOW_WIDTH + 20;
-        if (s->x > WINDOW_WIDTH + 10) s->x -= WINDOW_WIDTH + 20;
-    }
-}
-
-/* Fun fact: This implemenation is pretty similar to the act of PS2 hardware, Emotion Engine (EE, CPU) + Graphics Synthesizer (GS, GPU) */
-static void render_snow(Snow *snow, SDL_Renderer *renderer)
-{
-    if (renderer == NULL || snow == NULL) return;
-    if (snow->snow_sprite == NULL) return;
-
-    const int snow_count = snow->snowflake_count;
-
-    SDL_Vertex *v = snow->snow_vertices;
-    for (int i = 0; i < snow_count; i++)
-    {
-        Snowflake *s = &snow->snowflakes[i];
-        float w = s->size;
-        float x = s->x, y = s->y;
-        Uint8 alpha = (Uint8)(s->opacity * 255);
-        SDL_FColor color = { 1.0f, 1.0f, 1.0f, alpha / 255.0f };
-
-        // The positions of the four corners of the snowflake rectangle
-        SDL_FPoint positions[4] = {
-            { x - w, y - w },
-            { x + w, y - w },
-            { x - w, y + w },
-            { x + w, y + w }
-        };
-
-        /*
-            The texture coordinates of the vertices
-            This defines how the texture is mapped onto rectangle
-
-            vertex 0: (0, 0)
-            vertex 1: (1, 0)
-            vertex 2: (0, 1)
-            vertex 3: (1, 1)
-
-            This makes the actual memory look like: 
-                [ [(0, 0), (1, 0), (1, 0)],     // triangle 1
-                  [(1, 0), (1, 1), (0, 1)] ]    // triangle 2
-        */
-        SDL_FPoint uvs[4] = {
-            { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 }
-        };
-
-        for (int j = 0; j < 4; j++)
-        {
-            v->position = positions[j];
-            v->color = color;
-            v->tex_coord = uvs[j];
-            v++;
-        }
-    }
-
-    SDL_RenderGeometry(renderer, snow->snow_sprite,
-                       snow->snow_vertices, snow->num_vertices,
-                       snow->snow_indices,  snow->num_indices);
-}
-
-/* ====== Text Functions ====== */
-
-static bool create_text_texture(Text *text, const char *font_path, const char *str, int font_size,
-                                                                    SDL_Renderer *renderer, SDL_Color color)
-{
-    TTF_Font *font = TTF_OpenFont(font_path, font_size);
-    if (font == NULL)
-    {
-        fprintf(stderr, ERROR_TEXT " Failed to load font: %s\n", SDL_GetError());
-        return false;
-    }
-
-    SDL_Surface *surface = TTF_RenderText_Blended(font, str, 0, color);
-    TTF_CloseFont(font); // Free the font
-    font = NULL;
-    if (surface == NULL)
-    {
-        fprintf(stderr, ERROR_TEXT " Failed to render text: %s\n", SDL_GetError());
-        return false;
-    }
-
-    text->text_rect.w = surface->w;
-    text->text_rect.h = surface->h;
-
-    text->text_texture = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_DestroySurface(surface); // Free the surface
-    surface = NULL;
-    if (text->text_texture == NULL)
-    {
-        fprintf(stderr, ERROR_TEXT " Failed to create texture: %s\n", SDL_GetError());
-        return false;
-    }
-
-    return true;
-}
-
-static void render_text_texture(Text *text, SDL_Renderer *renderer, float x, float y)
-{
-    if (text == NULL || renderer == NULL) return;
-
-    text->text_rect.x = x;
-    text->text_rect.y = y;
-
-    SDL_RenderTexture(renderer, text->text_texture, NULL, &(text->text_rect));
-}
-
-static void destroy_text_texture(Text *text)
-{
-    if (text == NULL) return;
-
-    if (text->text_texture)
-        SDL_DestroyTexture(text->text_texture);
-}
-
-/* ====== Paddle Functions ====== */
-
-static void paddle_init(Paddle *paddle, int x, int y, int width, int height)
-{
-    if (paddle == NULL) return;
-    
-    paddle->paddle_rect.x = x;
-    paddle->paddle_rect.y = y;
-    paddle->paddle_rect.w = width;
-    paddle->paddle_rect.h = height;
-    paddle->direction = PADDLE_STOP;
-}
-
-static void paddle_move(Paddle *paddle, float dt)
-{
-    if (paddle == NULL) return;
-
-    float actual_distance = PADDLE_SPEED_PER_SEC * dt;
-
-    switch (paddle->direction)
-    {
-        case PADDLE_UP:
-            if (paddle->paddle_rect.y - actual_distance > WINDOW_BORDER_OFFSET)
-                paddle->paddle_rect.y -= actual_distance;
-            break;
-        case PADDLE_DOWN:
-            if (paddle->paddle_rect.y + actual_distance < WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - PADDLE_HEIGHT)
-                paddle->paddle_rect.y += actual_distance;
-            break;
-        case PADDLE_STOP:
-        default:
-            break;
-    }
-}
-
-static void render_paddle(Paddle *paddle, SDL_Renderer *renderer)
-{
-    if (paddle == NULL || renderer == NULL) return;
-
-    SDL_RenderFillRect(renderer, &(paddle->paddle_rect));
-}
-
-static void reset_paddle(Paddle *paddle)
-{
-    if (paddle == NULL) return;
-
-    /* Only reset the y position */
-    paddle->paddle_rect.y = (WINDOW_HEIGHT - PADDLE_HEIGHT) / 2;
-
-    paddle->direction = PADDLE_STOP;
-}
-
-/* ====== Ball Functions ====== */
-
-static void ball_init(Ball *ball, int x, int y, int width, int height)
-{
-    if (ball == NULL) return;
-
-    ball->rect.x = x;
-    ball->rect.y = y;
-    ball->rect.w = width;
-    ball->rect.h = height;
-    
-    ball->speed_x = (SHOUD_MOVE_REVERSE) ? -INITIAL_SPEED_PER_SEC : INITIAL_SPEED_PER_SEC;
-    ball->speed_y = (SHOUD_MOVE_REVERSE) ? -INITIAL_SPEED_PER_SEC : INITIAL_SPEED_PER_SEC;
-}
-
-static void reset_ball(Ball *ball, bool left_serve)
-{
-    if (ball == NULL) return;
-
-    ball->rect.x = (WINDOW_WIDTH - BALL_SIZE) / 2;
-    ball->rect.y = (WINDOW_HEIGHT - BALL_SIZE) / 2;
-    float speed_x = INITIAL_SPEED_PER_SEC;
-    ball->speed_x = (left_serve) ? speed_x : -speed_x;
-    ball->speed_y = (SHOUD_MOVE_REVERSE) ? INITIAL_SPEED_PER_SEC : -INITIAL_SPEED_PER_SEC;
-}
-
-static void speed_up_ball(Ball *ball)
-{
-    if (ball == NULL) return;
-
-    if (ball->speed_x <= MAX_SPEED)
-        ball->speed_x *= SPEED_UP_RATE;
-    if (ball->speed_y <= MAX_SPEED)
-        ball->speed_y *= SPEED_UP_RATE;
-}
-
-static CollisionType ball_collision(Ball *ball, Paddle *left_paddle, Paddle *right_paddle, float dt)
-{
-    if (ball == NULL || left_paddle == NULL || right_paddle == NULL) return COLLISION_NONE;
-
-    // First handle the score points
-    if (ball->rect.x < WINDOW_BORDER_OFFSET)
-    {
-        reset_ball(ball, true);
-        return COLLISION_LEFT;
-    }
-    else if (ball->rect.x > WINDOW_WIDTH - WINDOW_BORDER_OFFSET - BALL_SIZE)
-    {
-        reset_ball(ball, false);
-        return COLLISION_RIGHT;
-    }
-
-    // Bounce off the top and bottom walls
-    float new_y = ball->rect.y + ball->speed_y * dt;
-    if (new_y < WINDOW_BORDER_OFFSET || new_y > WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - BALL_SIZE)
-    {
-        ball->speed_y *= -1;
-        new_y = (new_y < WINDOW_BORDER_OFFSET) ? WINDOW_BORDER_OFFSET 
-                : WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - BALL_SIZE;
-    }
-
-    // Predict the ball's next position
-    float new_x = ball->rect.x + ball->speed_x * dt;
-    SDL_FRect next_rect = { new_x, new_y, ball->rect.w, ball->rect.h };
-
-    Paddle *chosen_paddle = (new_x < WINDOW_WIDTH / 2) ? left_paddle : right_paddle;
-
-    if (SDL_HasRectIntersectionFloat(&next_rect, &(chosen_paddle->paddle_rect)))
-    {
-        ball->speed_x = -(ball->speed_x + JITTER_PER_SEC);
-        if (ball->speed_x > 0)
-            new_x = chosen_paddle->paddle_rect.x + chosen_paddle->paddle_rect.w;
-        else
-            new_x = chosen_paddle->paddle_rect.x - BALL_SIZE;
-        speed_up_ball(ball);
-    }
-
-    // 应用最终位置
-    ball->rect.x = new_x;
-    ball->rect.y = new_y;
-
-    return COLLISION_NONE;
-}
-
-static void render_ball(Ball *ball, SDL_Renderer *renderer)
-{
-    if (ball == NULL || renderer == NULL) return;
-
-    SDL_RenderFillRect(renderer, &(ball->rect));
 }
 
 /*====== Game Logics ======*/
@@ -605,10 +173,16 @@ static void handle_key_down(Game *game, SDL_KeyboardEvent key)
 
         /* Increase or decrease the snowflake count */
         case SDL_SCANCODE_B:
-            increase_snow_count(&game->snow, 500);
+            increase_snow_count(&game->snow, 500, WINDOW_WIDTH, WINDOW_HEIGHT);
+#ifdef __EMSCRIPTEN__
+            notify_snow_count_change();
+#endif
             break;
         case SDL_SCANCODE_V:
-            increase_snow_count(&game->snow, -500);
+            increase_snow_count(&game->snow, -500, WINDOW_WIDTH, WINDOW_HEIGHT);
+#ifdef __EMSCRIPTEN__
+            notify_snow_count_change();
+#endif
             break;
 
         /* Right player paddle */
@@ -936,7 +510,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     float dt = calculate_delta_time(game);
 
-    update_snow(&game->snow, dt);
+    update_snow(&game->snow, WINDOW_WIDTH, WINDOW_HEIGHT, dt);
 
     render(game);
 
@@ -952,22 +526,27 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         game->resume_delay_time -= dt;
         return SDL_APP_CONTINUE;
     }
-    else game->resume_delay_time = 0.0f;
 
     if (game->state != GAME_RUNNING)
         return SDL_APP_CONTINUE;
 
-    paddle_move(&game->left_paddle, dt);
-    paddle_move(&game->right_paddle, dt);
+    paddle_move(&game->left_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET, dt);
+    paddle_move(&game->right_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET, dt);
 
-    CollisionType collision = ball_collision(&game->ball, &game->left_paddle, &game->right_paddle, dt);
+    CollisionType collision = ball_collision(&game->ball, &game->left_paddle, &game->right_paddle,
+                                WINDOW_BORDER_OFFSET, WINDOW_WIDTH - WINDOW_BORDER_OFFSET,
+                                WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET,
+                                dt);
+
     switch (collision)
     {
         case COLLISION_LEFT:
             score_points(game, false);
+            reset_ball(&game->ball, false);
             break;
         case COLLISION_RIGHT:
             score_points(game, true);
+            reset_ball(&game->ball, true);
             break;
         default:
             break;
@@ -1096,7 +675,8 @@ void set_snowflake_count(int count)
     game_ptr->last_key_ticks = SDL_GetTicks(); // Update the last key ticks to prevent the game from limiting the FPS
 #endif
 
-    increase_snow_count(&game_ptr->snow, count - game_ptr->snow.snowflake_count);
+    increase_snow_count(&game_ptr->snow, count - game_ptr->snow.snowflake_count, WINDOW_WIDTH, WINDOW_HEIGHT);
+    notify_snow_count_change();
 }
 
 EMSCRIPTEN_KEEPALIVE

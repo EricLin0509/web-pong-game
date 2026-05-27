@@ -5,7 +5,7 @@ EXE_CFLAGS= -lm -lSDL3 -lSDL3_ttf
 WASM_CFLAGS= -Wno-experimental -sUSE_SDL=3 -sUSE_SDL_TTF=3 -sUSE_FREETYPE=1
 EXPORTED_FUNCTIONS = -sEXPORTED_FUNCTIONS="['_main', '_start_game', '_pause_game', '_resume_game', '_restart_game', '_goto_menu', '_toggle_mode', '_set_snowflake_count']"
 OUT=pong
-SRC=main.c
+SRC=paddle.c ball.c snow.c text.c main.c
 
 all: release
 

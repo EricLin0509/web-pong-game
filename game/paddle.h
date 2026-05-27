@@ -2,7 +2,7 @@
 #define PADDLE_H
 
 #include <stdbool.h>
-#include <SDL3/SDL_main.h>
+#include <SDL3/SDL.h>
 
 #define PADDLE_WIDTH 15
 #define PADDLE_HEIGHT 120
@@ -19,6 +19,16 @@ typedef enum {
 typedef struct {
     SDL_FRect paddle_rect;
     PaddleMove direction;
+    float orig_y;
 } Paddle;
+
+void paddle_init(Paddle *paddle, int x, int y, int width, int height);
+
+/* @note: No need to minus the paddle height in the collision check, It already included */
+void paddle_move(Paddle *paddle, uint32_t min_y, uint32_t max_y, float dt);
+
+void render_paddle(Paddle *paddle, SDL_Renderer *renderer);
+
+void reset_paddle(Paddle *paddle);
 
 #endif // PADDLE_H

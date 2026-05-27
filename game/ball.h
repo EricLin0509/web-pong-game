@@ -2,7 +2,9 @@
 #define BALL_H
 
 #include <stdlib.h>
-#include <SDL3/SDL_main.h>
+#include <SDL3/SDL.h>
+
+#include "paddle.h"
 
 #define BALL_SIZE 20.0f
 #define INITIAL_SPEED_PER_SEC ((float)rand() / (float)RAND_MAX * 1.0f + 250.0f) // [300, 400]
@@ -19,8 +21,22 @@ typedef enum {
 
 typedef struct {
     SDL_FRect rect;
+    float orig_x;
+    float orig_y;
     float speed_x;
     float speed_y;
 } Ball;
+
+void ball_init(Ball *ball, float x, float y, int width, int height);
+
+void reset_ball(Ball *ball, bool left_serve);
+
+void speed_up_ball(Ball *ball);
+
+/* @note: No need to minus the ball size in the collision check, It already included */
+CollisionType ball_collision(Ball *ball, Paddle *left_paddle, Paddle *right_paddle,
+                           uint32_t col_min_x, uint32_t col_max_x, uint32_t col_min_y, uint32_t col_max_y, float dt);
+
+void render_ball(Ball *ball, SDL_Renderer *renderer);
 
 #endif // BALL_H

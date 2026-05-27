@@ -4,8 +4,9 @@
 #include <stddef.h>
 #include <assert.h>
 
+#include <SDL3/SDL.h>
+
 #include "text.h"
-#include "paddle.h"
 #include "ball.h"
 #include "snow.h"
 #include "themes.h"

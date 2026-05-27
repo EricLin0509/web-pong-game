@@ -34,6 +34,7 @@ void set_snowflake_count(int count);
 void notify_snow_count_change(void);
 void notify_score_points(void);
 void notify_game_state(void);
+void store_score_history(void);
 void report_wasm_frame(void);
 #endif
 
@@ -375,7 +376,12 @@ static void score_points(Game *game, bool is_left_score)
         game->max_score = *score;
 
     if (*score == game->score_to_win)
+    {
         game->state = GAME_OVER;
+#ifdef __EMSCRIPTEN__
+        store_score_history();
+#endif
+    }
 
 #ifdef __EMSCRIPTEN__
     notify_score_points();
@@ -711,6 +717,15 @@ void report_wasm_frame(void)
         if (typeof window.reportWasmFrame === "function")
             window.reportWasmFrame(performance.now());
     });
+}
+
+void store_score_history(void)
+{
+    if (game_ptr == NULL) return;
+    EM_ASM ({
+        if (typeof window.storeScoreHistory === "function")
+            window.storeScoreHistory($0, $1);
+    }, game_ptr->left_score, game_ptr->right_score);
 }
 
 void notify_snow_count_change(void)

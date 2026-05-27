@@ -234,7 +234,7 @@ onMounted(async () => {
     rightScore.value = right
   }
 
-  window.onGameOver = (left, right) => {
+  window.storeScoreHistory = (left, right) => {
     saveScoreRecord(left, right)
   }
 

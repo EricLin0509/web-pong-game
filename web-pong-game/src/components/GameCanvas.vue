@@ -47,6 +47,20 @@
       <h6>Source: <a href="https://en.wikipedia.org/wiki/Pong" target="_blank">Wikipedia</a></h6>
     </div>
   </div>
+
+  <div :class="['keyboard-hint', { 'animate-slide-right': isWasmLoaded}]" v-if="isWasmLoaded">
+    <h3>⌨️ Keyboard Controls</h3>
+    <ul>
+      <li><kbd>W</kbd> / <kbd>S</kbd> : Left paddle</li>
+      <li><kbd>I</kbd> / <kbd>K</kbd> : Right paddle</li>
+      <li><kbd>Space</kbd> : Start / Pause / Resume</li>
+      <li><kbd>M</kbd> : Switch mode</li>
+      <li><kbd>C</kbd> : Change theme</li>
+      <li><kbd>B</kbd> / <kbd>V</kbd> : Snowflakes +/-</li>
+      <li><kbd>ESC</kbd> : Back to menu</li>
+    </ul>
+  </div>
+
   <div :class="['history-panel', { 'animate-slide-right': isWasmLoaded }]" v-if="historyRecords.length">
     <h3>🏆 Recent scores (Classic)</h3>
     <ul>
@@ -521,6 +535,50 @@ canvas {
 .intro-content h6 a {
   color: #a1cbf3;
   text-decoration: none;
+}
+
+.keyboard-hint {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  border-radius: 16px;
+  padding: 12px 20px;
+  font-family: monospace;
+  color: #ccddee;
+  min-width: 220px;
+  border-left: 4px solid #5a9eff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+}
+
+.keyboard-hint h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: #5a9eff;
+}
+
+.keyboard-hint ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.keyboard-hint li {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.keyboard-hint kbd {
+  background: #2a3a4a;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-family: monospace;
+  font-weight: bold;
+  color: #ffaa66;
+  margin: 0 2px;
+  font-size: 12px;
 }
 
 .history-panel {

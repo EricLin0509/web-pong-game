@@ -437,19 +437,15 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
-#ifdef __EMSCRIPTEN__
-    game.window_renderer = SDL_CreateRenderer(game.window, NULL);
-#else
     /* Create renderer with vsync */
     SDL_PropertiesID props = SDL_CreateProperties();
 
     SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_WINDOW_POINTER, game.window);
-    SDL_SetNumberProperty(props, SDL_PROP_RENDERER_CREATE_PRESENT_VSYNC_NUMBER, 1);
+    SDL_SetNumberProperty(props, SDL_PROP_RENDERER_CREATE_PRESENT_VSYNC_NUMBER, -1); /* Use Adaptive VSync */
 
     game.window_renderer = SDL_CreateRendererWithProperties(props);
 
     SDL_DestroyProperties(props);
-#endif
 
     if (game.window_renderer == NULL)
     {

@@ -98,9 +98,8 @@ let observer = null
 
 // FPS display
 const fps = ref(0)
-let frameCount = 0
-let lastFpsTime = performance.now()
-let rafId = null
+let frameTimes = []
+let lastFrameTime = 0
 
 // Snowflake count
 const snowCount = ref(0)
@@ -114,16 +113,18 @@ function onSnowCountChange() {
   }
 }
 
-// Update FPS every second
-function updateFPS() {
-  const now = performance.now()
-  frameCount++
-  if (now - lastFpsTime >= 1000) {
-    fps.value = frameCount
-    frameCount = 0
-    lastFpsTime = now
+// Read frame time from C side and calculate FPS
+window.reportWasmFrame = (now) => {
+  if (lastFrameTime !== 0) {
+    const delta = now - lastFrameTime
+    frameTimes.push(delta)
+    // Save last 60 frame times for FPS calculation
+    if (frameTimes.length > 60) frameTimes.shift()
+    // Calculate average frame time to get FPS
+    const avgDelta = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length
+    fps.value = Math.round(1000 / avgDelta)
   }
-  rafId = requestAnimationFrame(updateFPS)
+  lastFrameTime = now
 }
 
 // Update snowflake count from C side
@@ -281,9 +282,6 @@ onMounted(async () => {
     observer.observe(introRef.value)
   }
 
-  // Initialize FPS
-  updateFPS()
-
   // Load history records
   loadHistory()
 })
@@ -292,6 +290,7 @@ onBeforeUnmount(() => {
   delete window.updateScore
   delete window.onGameOver
   delete window.updateSnowflakeCount
+  delete window.reportWasmFrame
 
   window.removeEventListener('resize', updateFrameStyles)
   document.removeEventListener('visibilitychange', handleVisibilityChange)

@@ -62,7 +62,8 @@ typedef struct {
     Uint64 last_counter;
     bool is_first_frame;
     float resume_delay_time;
-#ifndef BENCHMARK_MODE
+
+#ifndef __EMSCRIPTEN__
     Uint64 last_key_ticks;
     Uint64 last_frame_ticks;
 #endif

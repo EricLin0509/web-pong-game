@@ -21,7 +21,7 @@
 #define CLASSIC_WIN_SCORE 11
 #define INFINITE_WIN_SCORE SIZE_MAX // Use SIZE_MAX to represent infinity
 
-#ifndef BENCHMARK_MODE // Disable benchmark mode by default
+#ifndef __EMSCRIPTEN__
 #define IDLE_TIMEOUT_MS 2000 // 2 seconds idle timeout
 #define IDLE_FPS 20
 #endif
@@ -341,7 +341,7 @@ static float calculate_delta_time(Game *game)
     return dt;
 }
 
-#ifndef BENCHMARK_MODE
+#ifndef __EMSCRIPTEN__
 
 /* Limit the FPS to save energy */
 static void handle_idle(Game *game)
@@ -437,7 +437,20 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
+#ifdef __EMSCRIPTEN__
     game.window_renderer = SDL_CreateRenderer(game.window, NULL);
+#else
+    /* Create renderer with vsync */
+    SDL_PropertiesID props = SDL_CreateProperties();
+
+    SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_WINDOW_POINTER, game.window);
+    SDL_SetNumberProperty(props, SDL_PROP_RENDERER_CREATE_PRESENT_VSYNC_NUMBER, 1);
+
+    game.window_renderer = SDL_CreateRendererWithProperties(props);
+
+    SDL_DestroyProperties(props);
+#endif
+
     if (game.window_renderer == NULL)
     {
         fprintf(stderr, ERROR_TEXT " Failed to create renderer: %s\n", SDL_GetError());
@@ -499,7 +512,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     game.state = GAME_INIT;
     game.resume_delay_time = 0.0f;
-#ifndef BENCHMARK_MODE
+#ifndef __EMSCRIPTEN__
     game.last_key_ticks = SDL_GetTicks();
     game.last_frame_ticks = SDL_GetTicks();
 #endif
@@ -510,7 +523,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 {
     Game *game = (Game *)appstate;
 
-#ifndef BENCHMARK_MODE
+#ifndef __EMSCRIPTEN__
     handle_idle(game);
 #endif
 
@@ -570,13 +583,13 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         case SDL_EVENT_QUIT:
             return SDL_APP_SUCCESS;
         case SDL_EVENT_KEY_DOWN:
-#ifndef BENCHMARK_MODE
+#ifndef __EMSCRIPTEN__
             game->last_key_ticks = SDL_GetTicks();
 #endif
             handle_key_down(game, event->key);
             break;
         case SDL_EVENT_KEY_UP:
-#ifndef BENCHMARK_MODE
+#ifndef __EMSCRIPTEN__
             game->last_key_ticks = SDL_GetTicks();
 #endif
             handle_key_up(game, event->key);
@@ -676,10 +689,6 @@ EMSCRIPTEN_KEEPALIVE
 void set_snowflake_count(int count)
 {
     if (game_ptr == NULL) return;
-
-#ifndef BENCHMARK_MODE
-    game_ptr->last_key_ticks = SDL_GetTicks(); // Update the last key ticks to prevent the game from limiting the FPS
-#endif
 
     increase_snow_count(&game_ptr->snow, count - game_ptr->snow.snowflake_count, WINDOW_WIDTH, WINDOW_HEIGHT);
     notify_snow_count_change();

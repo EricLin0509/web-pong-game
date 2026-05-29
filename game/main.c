@@ -21,9 +21,8 @@
 #define CLASSIC_WIN_SCORE 11
 #define INFINITE_WIN_SCORE SIZE_MAX // Use SIZE_MAX to represent infinity
 
-#ifndef __EMSCRIPTEN__
+#ifndef BENCHMARK_MODE
 #define IDLE_TIMEOUT_MS 2000 // 2 seconds idle timeout
-#define IDLE_FPS 20
 #endif
 
 #ifdef __EMSCRIPTEN__
@@ -341,26 +340,24 @@ static float calculate_delta_time(Game *game)
     return dt;
 }
 
-#ifndef __EMSCRIPTEN__
+#ifndef BENCHMARK_MODE
 
-/* Limit the FPS to save energy */
-static void handle_idle(Game *game)
+/* Stop rendering when timeout to save energy */
+static bool handle_idle(Game *game)
 {
-    if (game == NULL) return;
-    if (game->state == GAME_RUNNING) return;
+    if (game == NULL) return false;
+    if (game->state == GAME_RUNNING) return false;
+    if (game->snow.snowflake_count > 0)
+    {
+        game->last_key_ticks = SDL_GetTicks();
+        return false;
+    }
 
     /* Calculate the idle time */
     Uint64 now = SDL_GetTicks();
     Uint64 idle_ms = now - game->last_key_ticks;
-    if (idle_ms > IDLE_TIMEOUT_MS)
-    {
-        Uint64 target_frame_ms = 1000 / IDLE_FPS; // Target frame time in milliseconds
-        Uint64 elapsed = now - game->last_frame_ticks; // Elapsed time since last frame
-        if (elapsed < target_frame_ms)
-            SDL_Delay(target_frame_ms - elapsed); // Wait for the remaining time
-    }
-
-    game->last_frame_ticks = SDL_GetTicks();
+    
+    return idle_ms > IDLE_TIMEOUT_MS;
 }
 
 #endif
@@ -512,9 +509,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     game.state = GAME_INIT;
     game.resume_delay_time = 0.0f;
-#ifndef __EMSCRIPTEN__
+
+#ifndef BENCHMARK_MODE
     game.last_key_ticks = SDL_GetTicks();
-    game.last_frame_ticks = SDL_GetTicks();
 #endif
     return SDL_APP_CONTINUE;
 }
@@ -523,8 +520,13 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 {
     Game *game = (Game *)appstate;
 
-#ifndef __EMSCRIPTEN__
-    handle_idle(game);
+#ifdef __EMSCRIPTEN__
+    notify_game_state();
+#endif
+
+#ifndef BENCHMARK_MODE
+    if (handle_idle(game))
+        return SDL_APP_CONTINUE;
 #endif
 
     float dt = calculate_delta_time(game);
@@ -534,7 +536,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     render(game);
 
 #ifdef __EMSCRIPTEN__
-    notify_game_state();
     report_wasm_frame();
 #endif
 
@@ -583,20 +584,23 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         case SDL_EVENT_QUIT:
             return SDL_APP_SUCCESS;
         case SDL_EVENT_KEY_DOWN:
-#ifndef __EMSCRIPTEN__
-            game->last_key_ticks = SDL_GetTicks();
-#endif
             handle_key_down(game, event->key);
             break;
         case SDL_EVENT_KEY_UP:
-#ifndef __EMSCRIPTEN__
-            game->last_key_ticks = SDL_GetTicks();
-#endif
             handle_key_up(game, event->key);
             break;
-        default:
+        case SDL_EVENT_WINDOW_RESIZED:
+        case SDL_EVENT_WINDOW_MOVED:
+        case SDL_EVENT_WINDOW_FOCUS_GAINED:
+        case SDL_EVENT_WINDOW_EXPOSED:
             break;
+        default:
+            return SDL_APP_CONTINUE;
     }
+
+#ifndef BENCHMARK_MODE
+    game->last_key_ticks = SDL_GetTicks();
+#endif
 
     return SDL_APP_CONTINUE;
 }
@@ -676,6 +680,11 @@ void goto_menu(void)
 
     game_reset(game_ptr);
     game_ptr->state = GAME_INIT;
+
+    /* Refresh the UI */
+#ifndef BENCHMARK_MODE
+    game_ptr->last_key_ticks = SDL_GetTicks();
+#endif
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -683,6 +692,11 @@ void toggle_mode(void)
 {
     if (game_ptr && game_ptr->state == GAME_INIT)
         switch_mode(game_ptr);
+
+    /* Refresh the UI */
+#ifndef BENCHMARK_MODE
+    game_ptr->last_key_ticks = SDL_GetTicks();
+#endif
 }
 
 EMSCRIPTEN_KEEPALIVE

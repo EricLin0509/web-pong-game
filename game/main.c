@@ -28,13 +28,13 @@
 #ifdef __EMSCRIPTEN__
 Game *game_ptr = NULL; // Expose the game struct to WebAssembly
 
-void pause_game(void);
-void set_snowflake_count(int count);
 void notify_snow_count_change(void);
+void report_wasm_frame(void);
+#ifndef BENCHMARK_MODE
 void notify_score_points(void);
 void notify_game_state(void);
 void store_score_history(void);
-void report_wasm_frame(void);
+#endif
 #endif
 
 /* ===== Theme Functions ====== */
@@ -93,7 +93,7 @@ static void game_reset(Game *game)
     reset_paddle(&game->left_paddle);
     reset_paddle(&game->right_paddle);
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) && !defined(BENCHMARK_MODE)
     notify_score_points();
 #endif
 }
@@ -389,12 +389,12 @@ static void score_points(Game *game, bool is_left_score)
     if (*score == game->score_to_win)
     {
         game->state = GAME_OVER;
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) && !defined(BENCHMARK_MODE)
         store_score_history();
 #endif
     }
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) && !defined(BENCHMARK_MODE)
     notify_score_points();
 #endif
 }
@@ -512,7 +512,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     set_theme(&game);
 
     /* Notify the initial score */
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) && !defined(BENCHMARK_MODE)
     notify_game_state();
     notify_score_points();
 #endif
@@ -534,7 +534,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 {
     Game *game = (Game *)appstate;
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) && !defined(BENCHMARK_MODE)
     notify_game_state();
 #endif
 
@@ -717,6 +717,26 @@ int get_game_state(void)
     return game_ptr ? game_ptr->state : -1;
 }
 
+void notify_snow_count_change(void)
+{
+    if (game_ptr == NULL) return;
+    EM_ASM ({
+        if (typeof window.updateSnowflakeCount === "function")
+            window.updateSnowflakeCount($0);
+    }, game_ptr->snow.snowflake_count);
+}
+
+void report_wasm_frame(void)
+{
+    if (game_ptr == NULL) return;
+    EM_ASM ({
+        if (typeof window.reportWasmFrame === "function")
+            window.reportWasmFrame(performance.now());
+    });
+}
+
+#ifndef BENCHMARK_MODE
+
 void notify_score_points(void)
 {
     if (game_ptr == NULL) return;
@@ -736,15 +756,6 @@ void notify_game_state(void)
     }, game_ptr->state);
 }
 
-void report_wasm_frame(void)
-{
-    if (game_ptr == NULL) return;
-    EM_ASM ({
-        if (typeof window.reportWasmFrame === "function")
-            window.reportWasmFrame(performance.now());
-    });
-}
-
 void store_score_history(void)
 {
     if (game_ptr == NULL) return;
@@ -754,13 +765,6 @@ void store_score_history(void)
     }, game_ptr->left_score, game_ptr->right_score);
 }
 
-void notify_snow_count_change(void)
-{
-    if (game_ptr == NULL) return;
-    EM_ASM ({
-        if (typeof window.updateSnowflakeCount === "function")
-            window.updateSnowflakeCount($0);
-    }, game_ptr->snow.snowflake_count);
-}
+#endif // BENCHMARK_MODE
 
 #endif // __EMSCRIPTEN__

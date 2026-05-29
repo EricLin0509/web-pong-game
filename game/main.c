@@ -74,6 +74,10 @@ static void switch_mode(Game *game)
     game->mode ^= MODE_INFINITE; // Toggle between classic and infinite mode
 
     game->score_to_win = (game->mode == MODE_INFINITE) ? INFINITE_WIN_SCORE : CLASSIC_WIN_SCORE;
+
+#ifndef BENCHMARK_MODE
+    game->last_key_ticks = SDL_GetTicks(); // Refresh the UI
+#endif
 }
 
 /*====== Game Logics ======*/
@@ -345,8 +349,18 @@ static float calculate_delta_time(Game *game)
 /* Stop rendering when timeout to save energy */
 static bool handle_idle(Game *game)
 {
+    static GameState last_state = GAME_INIT;
+
     if (game == NULL) return false;
-    if (game->state == GAME_RUNNING) return false;
+
+    if (game->state != last_state ||
+        game->state == GAME_RUNNING) // State change or game is running, reset the idle timer
+    {
+        last_state = game->state;
+        game->last_key_ticks = SDL_GetTicks();
+        return false;
+    }
+
     if (game->snow.snowflake_count > 0)
     {
         game->last_key_ticks = SDL_GetTicks();
@@ -589,18 +603,17 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         case SDL_EVENT_KEY_UP:
             handle_key_up(game, event->key);
             break;
+#ifndef BENCHMARK_MODE
         case SDL_EVENT_WINDOW_RESIZED:
         case SDL_EVENT_WINDOW_MOVED:
         case SDL_EVENT_WINDOW_FOCUS_GAINED:
         case SDL_EVENT_WINDOW_EXPOSED:
+            game->last_key_ticks = SDL_GetTicks(); /* Reset the idle timer when window has event */
             break;
-        default:
-            return SDL_APP_CONTINUE;
-    }
-
-#ifndef BENCHMARK_MODE
-    game->last_key_ticks = SDL_GetTicks();
 #endif
+        default:
+            break;
+    }
 
     return SDL_APP_CONTINUE;
 }
@@ -680,11 +693,6 @@ void goto_menu(void)
 
     game_reset(game_ptr);
     game_ptr->state = GAME_INIT;
-
-    /* Refresh the UI */
-#ifndef BENCHMARK_MODE
-    game_ptr->last_key_ticks = SDL_GetTicks();
-#endif
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -692,11 +700,6 @@ void toggle_mode(void)
 {
     if (game_ptr && game_ptr->state == GAME_INIT)
         switch_mode(game_ptr);
-
-    /* Refresh the UI */
-#ifndef BENCHMARK_MODE
-    game_ptr->last_key_ticks = SDL_GetTicks();
-#endif
 }
 
 EMSCRIPTEN_KEEPALIVE

@@ -62,6 +62,10 @@ static void set_theme(Game *game)
             fprintf(stderr, WARNING_TEXT " Failed to set color of text texture: %s\n", SDL_GetError());
         text_region++;
     }
+
+#ifndef BENCHMARK_MODE
+    game->last_key_ticks = SDL_GetTicks(); // Refresh the UI
+#endif
 }
 
 /* ===== Mode switch functions ====== */

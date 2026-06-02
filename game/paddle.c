@@ -22,10 +22,14 @@ void paddle_move(Paddle *paddle, uint32_t min_y, uint32_t max_y, float dt)
         case PADDLE_UP:
             if (paddle->paddle_rect.y - actual_distance > min_y)
                 paddle->paddle_rect.y -= actual_distance;
+            else
+                paddle->paddle_rect.y = min_y; // Clamp to the minimum y position
             break;
         case PADDLE_DOWN:
             if (paddle->paddle_rect.y + actual_distance < max_y - paddle->paddle_rect.h)
                 paddle->paddle_rect.y += actual_distance;
+            else
+                paddle->paddle_rect.y = max_y - paddle->paddle_rect.h; // Clamp to the maximum y position
             break;
         case PADDLE_STOP:
         default:

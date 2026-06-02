@@ -14,6 +14,9 @@ Featuring two‑player gameplay, visual effects, local score history, and authen
 - Random color themes (press `C`)
 - Hit‑angle based ball bounce (original Pong behaviour)
 - Score history stored in browser (implemented by `localStorage`, **Classic mode only**)
+- **Touch support** – slide on left/right half to move paddles, double‑tap anywhere to (re)start the game
+    - **Note:** double‑tap only supports native build
+- **Idle energy saving** – reduces GPU usage when game is paused or in menus (Web & native)
 - Responsive layout with on‑screen controls (**Vue app only**)
 
 ## 🔧 Dependencies
@@ -64,6 +67,8 @@ Then enjoy 🎉!
 
 ## 🎮 How to Play
 
+There are two input methods available: **Keyboard** and **Touch**.
+
 | Actions | Key(s) |
 | :-------: | :------: |
 | Left paddle up/down | W / S |
@@ -73,5 +78,11 @@ Then enjoy 🎉!
 | Change theme | C |
 | Add / Remove snow | B / V |
 | Return to menu | Esc |
+
+| Touch Controls | Description |
+| :-------: | :------: |
+| Drag on left half | Move left paddle up/down |
+| Drag on right half | Move right paddle up/down |
+| Double‑tap anywhere | (Re)start the game |
 
 The game automatically pauses when the canvas loses focus. Click the canvas and press Space to resume **(Vue app only)**.

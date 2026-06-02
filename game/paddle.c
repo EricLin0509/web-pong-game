@@ -33,6 +33,17 @@ void paddle_move(Paddle *paddle, uint32_t min_y, uint32_t max_y, float dt)
     }
 }
 
+void paddle_move_touch(Paddle *paddle, uint32_t min_y, uint32_t max_y, float delta_y)
+{
+    if (paddle == NULL) return;
+
+    float new_pos = paddle->paddle_rect.y + delta_y; // Calculate the new position based on touch input
+
+    if (new_pos < min_y || new_pos > max_y - paddle->paddle_rect.h) return;
+
+    paddle->paddle_rect.y = new_pos; // Update the paddle's position
+}
+
 void render_paddle(Paddle *paddle, SDL_Renderer *renderer)
 {
     if (paddle == NULL || renderer == NULL) return;

@@ -129,6 +129,75 @@ static void handle_key_up(Game *game, SDL_KeyboardEvent key)
     }
 }
 
+static void handle_touch(Game *game, SDL_TouchFingerEvent finger)
+{
+    if (game == NULL) return;
+    if (game->state != GAME_RUNNING) return;
+
+    float x = finger.x * WINDOW_WIDTH;
+    float delta_y = finger.dy * WINDOW_HEIGHT;
+
+    Paddle *chosen_paddle = x < WINDOW_WIDTH / 2 ? &game->left_paddle : &game->right_paddle;
+
+    paddle_move_touch(chosen_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET, delta_y);
+}
+
+#ifndef __EMSCRIPTEN__
+
+static void double_tap_actions(Game *game)
+{
+    if (game == NULL) return;
+
+    switch (game->state)
+    {
+        case GAME_INIT:
+            game->state = GAME_RUNNING;
+            break;
+        case GAME_RUNNING:
+            game->state = GAME_PAUSED;
+            break;
+        case GAME_PAUSED:
+            game->resume_delay_time = 0.5f; // Resume the game should a bit longer
+            game->state = GAME_RUNNING;
+            break;
+        case GAME_OVER:
+            game_reset(game);
+            game->state = GAME_RUNNING;
+            break;
+        default:
+            break;
+    }
+}
+
+static void handle_double_tap(Game *game, SDL_TouchFingerEvent finger)
+{
+    float touch_x = finger.x * WINDOW_WIDTH;
+    float touch_y = finger.y * WINDOW_HEIGHT;
+    Uint64 now = SDL_GetTicks();
+    Uint64 delta_time = now - game->last_tap.last_touch_tick;
+
+    // Double tap condition: same finger, within 300ms and within 20px of the last touch position
+    if (game->last_tap.last_finger_id != 0 &&
+        finger.fingerID == game->last_tap.last_finger_id &&
+        delta_time < 300 &&
+        SDL_fabs(touch_x - game->last_tap.last_touch_x) < 20 &&
+        SDL_fabs(touch_y - game->last_tap.last_touch_y) < 20)
+    {
+        double_tap_actions(game);
+        
+        /* Reset the last touch tick */
+        game->last_tap.last_touch_tick = 0;
+        return;
+    }
+
+    game->last_tap.last_touch_tick = now;
+    game->last_tap.last_finger_id = finger.fingerID;
+    game->last_tap.last_touch_x = touch_x;
+    game->last_tap.last_touch_y = touch_y;
+}
+
+#endif
+
 /* The space key has many functions in Pong, so we need to handle it separately */
 static void handle_space_key(Game *game)
 {
@@ -143,7 +212,7 @@ static void handle_space_key(Game *game)
             game->state = GAME_PAUSED;
             break;
         case GAME_PAUSED:
-            game->resume_delay_time = 0.25f;
+            game->resume_delay_time = 0.5f;
             game->state = GAME_RUNNING;
             break;
         case GAME_OVER:
@@ -515,6 +584,16 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     /* Initialize theme */
     set_theme(&game);
 
+#ifndef __EMSCRIPTEN__
+
+    /* Initialize touch state */
+    game.last_tap.last_touch_tick = 0; 
+    game.last_tap.last_finger_id = 0;
+    game.last_tap.last_touch_x = 0;
+    game.last_tap.last_touch_y = 0;
+
+#endif
+
     /* Notify the initial score */
 #if defined(__EMSCRIPTEN__) && !defined(BENCHMARK_MODE)
     notify_game_state();
@@ -607,6 +686,14 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         case SDL_EVENT_KEY_UP:
             handle_key_up(game, event->key);
             break;
+        case SDL_EVENT_FINGER_MOTION:
+            handle_touch(game, event->tfinger);
+            break;
+#ifndef __EMSCRIPTEN__
+        case SDL_EVENT_FINGER_DOWN:
+            handle_double_tap(game, event->tfinger);
+            break;
+#endif
 #ifndef BENCHMARK_MODE
         case SDL_EVENT_WINDOW_RESIZED:
         case SDL_EVENT_WINDOW_MOVED:
@@ -676,7 +763,7 @@ void resume_game(void)
 
     if (game_ptr->state != GAME_PAUSED) return;
 
-    game_ptr->resume_delay_time = 0.25f;
+    game_ptr->resume_delay_time = 0.5f;
     game_ptr->state = GAME_RUNNING;
 }
 

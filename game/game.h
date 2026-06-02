@@ -26,6 +26,17 @@ typedef enum {
     MODE_INFINITE = 1,
 } GameMode;
 
+#ifndef __EMSCRIPTEN__ // Browser probably not support double tap gesture
+
+typedef struct {
+    Uint64 last_touch_tick;
+    float last_touch_x;
+    float last_touch_y;
+    SDL_FingerID last_finger_id;
+} LastTap; // Add Double Tap gesture support
+
+#endif
+
 typedef struct {
     SDL_Window *window;
     SDL_FRect window_boarder;
@@ -58,6 +69,10 @@ typedef struct {
 
     GameState state;
     Theme const *theme;
+
+#ifndef __EMSCRIPTEN__
+    LastTap last_tap;
+#endif
 
     Uint64 last_counter;
     bool is_first_frame;

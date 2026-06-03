@@ -61,6 +61,7 @@ typedef struct {
     Text game_over_description;
 
     GameMode mode;
+    bool is_single_player;
 
     size_t score_to_win;
     size_t max_score;

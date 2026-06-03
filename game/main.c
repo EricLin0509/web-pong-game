@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <time.h>
+#include <math.h>
 #include <stdbool.h>
 
 #define SDL_MAIN_USE_CALLBACKS 1
@@ -17,6 +18,7 @@
 #define WINDOW_BORDER_OFFSET 10
 #define WINDOW_TITLE "Pong"
 #define LINE_WIDTH 2
+#define AI_MISTAKE ((float)rand() / (float)RAND_MAX * 300.0f - 150.0f) // [-150, 150] for the AI to make some mistakes
 
 #define CLASSIC_WIN_SCORE 11
 #define INFINITE_WIN_SCORE SIZE_MAX // Use SIZE_MAX to represent infinity
@@ -138,6 +140,62 @@ static void handle_key_up(Game *game, SDL_KeyboardEvent key)
         default:
             break;
     }
+}
+
+static void ai_control(Game *game, float dt)
+{
+    if (game == NULL) return;
+
+    if (!game->is_single_player) return;
+    if (game->state != GAME_RUNNING) return;
+    if (game->ball.speed_x < 0) return; // The ball is moving to the left, no need to control
+
+    Paddle *ai_paddle = &game->right_paddle; // Choose the right paddle to control
+
+    /* Calculate the time of ball coming to the right hand side */
+    float right_wall_x = WINDOW_WIDTH - WINDOW_BORDER_OFFSET - BALL_SIZE;
+    float delta_x = right_wall_x - game->ball.rect.x;
+    float time = delta_x / game->ball.speed_x;
+    if (time <= 0) return;
+
+    float predicted_y = game->ball.rect.y + game->ball.speed_y * time;;
+
+    /* Fix the prediction when bounce back between up and down */
+    while (predicted_y < WINDOW_BORDER_OFFSET || predicted_y > WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - BALL_SIZE)
+    {
+        if (predicted_y < WINDOW_BORDER_OFFSET)
+            predicted_y = 2 * WINDOW_BORDER_OFFSET - predicted_y;
+        else
+            predicted_y = 2 * (WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - BALL_SIZE) - predicted_y;
+    }
+
+    /* Add some mistakes for AI after every 30 frames */
+    static int frame_counter = 0;
+    static float mistake = 0;
+    frame_counter++;
+    if (frame_counter >= 30)
+    {
+        frame_counter = 0;
+        mistake = AI_MISTAKE;   // [-150, 150]
+    }
+
+    float target_y = predicted_y - ai_paddle->paddle_rect.h / 2 + mistake;
+    target_y = SDL_clamp(target_y, WINDOW_BORDER_OFFSET,
+                         WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - ai_paddle->paddle_rect.h);
+
+    float diff = target_y - ai_paddle->paddle_rect.y;
+    float move = PADDLE_SPEED_PER_SEC * dt;
+
+    // Move the paddle the diff is big enough to prevent paddle shaking
+    if (fabsf(diff) < 1.5f) return;
+    if (diff > 0)
+        ai_paddle->paddle_rect.y += (diff > move ? move : diff);
+    else
+        ai_paddle->paddle_rect.y -= (-diff > move ? move : -diff);
+
+    ai_paddle->paddle_rect.y = SDL_clamp(ai_paddle->paddle_rect.y,
+                                        WINDOW_BORDER_OFFSET,
+                                        WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - ai_paddle->paddle_rect.h);
 }
 
 static void handle_touch(Game *game, SDL_TouchFingerEvent finger)
@@ -614,6 +672,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     /* Initialize game mode to classic mode */
     game.mode = MODE_CLASSIC;
     game.score_to_win = CLASSIC_WIN_SCORE;
+    game.is_single_player = true;
 
     game.state = GAME_INIT;
     game.resume_delay_time = 0.0f;
@@ -659,7 +718,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         return SDL_APP_CONTINUE;
 
     paddle_move(&game->left_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET, dt);
-    paddle_move(&game->right_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET, dt);
+    
+    if (game->is_single_player)
+        ai_control(game, dt);
+    else
+        paddle_move(&game->right_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET, dt);
 
     CollisionType collision = ball_collision(&game->ball, &game->left_paddle, &game->right_paddle,
                                 WINDOW_BORDER_OFFSET, WINDOW_WIDTH - WINDOW_BORDER_OFFSET,

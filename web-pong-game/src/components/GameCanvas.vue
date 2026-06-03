@@ -1,7 +1,15 @@
 <template>
   <div class="game-wrapper">
-    <div :class="['fps-display', { 'animate-slide-down': isWasmLoaded },
-      { 'fps-low': fps < 60 && fps >= 30, 'fps-very-low': fps < 30 }]">FPS: {{ fps }}</div>
+  <div class="game-info" :class="{ 'animate-slide-down': isWasmLoaded }">
+    <div class="info-item">
+      <span class="info-icon">🎮</span>
+      <span :class="['info-text', gameMode === 'Classic' ? 'mode-classic' : 'mode-infinite']">{{ gameMode }}</span>
+    </div>
+    <div class="info-item">
+      <span class="info-icon">🎨</span>
+      <span class="info-text">Theme <span class="theme-badge">{{ themeNumber }}</span></span>
+    </div>
+  </div>
     <div class="screen-container">
       <!-- Player 1 score -->
       <div :class="['score score-left', { show: gameState === 1 || gameState === 2, flash: flashLeft }]">{{ leftScore }}</div>
@@ -96,10 +104,9 @@ const introRef = ref(null)
 const introVisible = ref(false)
 let observer = null
 
-// FPS display
-const fps = ref(0)
-let frameTimes = []
-let lastFrameTime = 0
+// Game mode and theme number
+const gameMode = ref('Classic')
+const themeNumber = ref(1)
 
 // Snowflake count
 const snowCount = ref(0)
@@ -111,20 +118,6 @@ function onSnowCountChange() {
   if (pongModule && typeof pongModule._set_snowflake_count === 'function') {
     pongModule._set_snowflake_count(snowCount.value)
   }
-}
-
-// Read frame time from C side and calculate FPS
-window.reportWasmFrame = (now) => {
-  if (lastFrameTime !== 0) {
-    const delta = now - lastFrameTime
-    frameTimes.push(delta)
-    // Save last 60 frame times for FPS calculation
-    if (frameTimes.length > 60) frameTimes.shift()
-    // Calculate average frame time to get FPS
-    const avgDelta = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length
-    fps.value = Math.round(1000 / avgDelta)
-  }
-  lastFrameTime = now
 }
 
 // Update snowflake count from C side
@@ -140,6 +133,11 @@ function handleVisibilityChange() {
 
 window.onGameStateChange = (state) => {
   gameState.value = state
+}
+
+window.onModeThemeChange = (mode, themeIdx) => {
+  gameMode.value = mode === 0 ? 'Classic' : 'Infinite'
+  themeNumber.value = themeIdx
 }
 
 function startGame() {
@@ -290,7 +288,7 @@ onBeforeUnmount(() => {
   delete window.updateScore
   delete window.onGameOver
   delete window.updateSnowflakeCount
-  delete window.reportWasmFrame
+  delete window.onModeThemeChange
 
   window.removeEventListener('resize', updateFrameStyles)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
@@ -367,28 +365,57 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
-.fps-display {
-  font-family: monospace;
-  font-size: 18px;
-  background: #1e2a3a;
-  padding: 4px 12px;
-  border-radius: 20px;
-  color: #88ffaa;
+.game-info {
+  font-family: 'Courier New', 'Fira Code', monospace;
+  font-size: 1.2rem;
   font-weight: bold;
+  background: rgba(10, 20, 30, 0.7);
+  backdrop-filter: blur(8px);
+  color: #ffdd99;
+  padding: 8px 20px;
+  border-radius: 50px;
+  border: 2px solid rgba(255, 220, 150, 0.5);
+  box-shadow: 0 0 12px rgba(0,0,0,0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 24px;
   letter-spacing: 1px;
-  box-shadow: 0 0 4px rgba(0,0,0,0.3);
+  transition: all 0.2s;
+  position: relative;
+  z-index: 10;
 }
 
-.fps-display.fps-low {
-  color: #ffaa66;
-  text-shadow: 0 0 4px rgba(255,170,0,0.5);
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.fps-display.fps-very-low {
-  color: #ff4444;
-  text-shadow: 0 0 4px rgba(255,0,0,0.5);
+.info-icon {
+  font-size: 1.3rem;
+  filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
 }
-  
+
+.info-text {
+  color: #f8f8f2;
+  text-shadow: 0 0 2px #000;
+}
+
+.mode-classic {
+  color: #88c0ff;
+}
+.mode-infinite {
+  color: #ffb86c;
+}
+
+.theme-badge {
+  background: rgba(0,0,0,0.5);
+  border-radius: 20px;
+  padding: 2px 10px;
+  margin-left: 4px;
+  font-size: 0.9rem;
+  color: #ffdd99;
+}  
 
 .count-value {
   font-weight: bold;
@@ -565,7 +592,7 @@ canvas {
 }
 
 .keyboard-hint:hover {
-  width: 260px;
+  width: 320px;
   height: auto;
   border-radius: 12px;
   border-left: 12px solid #5a9eff;
@@ -785,7 +812,7 @@ kbd {
   animation: slideRightEnter 0.7s ease-out forwards;
 }
 
-.fps-display,
+.game-info,
 .control-bar,
 .score,
 .frame {

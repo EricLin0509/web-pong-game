@@ -68,6 +68,7 @@ typedef struct {
     size_t right_score;
 
     GameState state;
+    Uint8 theme_index; // Index of the current theme
     Theme const *theme;
 
 #ifndef __EMSCRIPTEN__

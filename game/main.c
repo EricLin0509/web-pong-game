@@ -29,8 +29,11 @@
 Game *game_ptr = NULL; // Expose the game struct to WebAssembly
 
 void notify_snow_count_change(void);
+#ifdef BENCHMARK_MODE
 void report_wasm_frame(void);
+#endif
 #ifndef BENCHMARK_MODE
+void notify_mode_theme(void);
 void notify_score_points(void);
 void notify_game_state(void);
 void store_score_history(void);
@@ -43,10 +46,10 @@ static void set_theme(Game *game)
 {
     if (game == NULL) return;
 
-    int theme_index = rand() % THEME_COUNT;
+    game->theme_index = rand() % THEME_COUNT;
 
-    game->theme = (game->theme != themes + theme_index) ?
-        themes + theme_index : themes + (theme_index + 1) % THEME_COUNT;
+    game->theme = (game->theme != themes + game->theme_index) ?
+        themes + game->theme_index : themes + (game->theme_index + 1) % THEME_COUNT;
 
     /* Due to the Text fields are continuous, we can set the color of all Text fields at once */
     Text *text_region = &game->welcome_text;
@@ -65,6 +68,10 @@ static void set_theme(Game *game)
 
 #ifndef BENCHMARK_MODE
     game->last_key_ticks = SDL_GetTicks(); // Refresh the UI
+
+#ifdef __EMSCRIPTEN__
+    notify_mode_theme();
+#endif
 #endif
 }
 
@@ -81,6 +88,10 @@ static void switch_mode(Game *game)
 
 #ifndef BENCHMARK_MODE
     game->last_key_ticks = SDL_GetTicks(); // Refresh the UI
+
+#ifdef __EMSCRIPTEN__
+    notify_mode_theme();
+#endif
 #endif
 }
 
@@ -632,7 +643,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     render(game);
 
-#ifdef __EMSCRIPTEN__
+#ifdef BENCHMARK_MODE
     report_wasm_frame();
 #endif
 
@@ -817,6 +828,8 @@ void notify_snow_count_change(void)
     }, game_ptr->snow.snowflake_count);
 }
 
+#ifdef BENCHMARK_MODE
+
 void report_wasm_frame(void)
 {
     if (game_ptr == NULL) return;
@@ -826,7 +839,18 @@ void report_wasm_frame(void)
     });
 }
 
+#endif
+
 #ifndef BENCHMARK_MODE
+
+void notify_mode_theme(void)
+{
+    if (game_ptr == NULL) return;
+    EM_ASM({
+        if (typeof window.onModeThemeChange === 'function')
+            window.onModeThemeChange($0, $1);
+    }, game_ptr->mode, game_ptr->theme_index + 1);
+}
 
 void notify_score_points(void)
 {

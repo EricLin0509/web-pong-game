@@ -6,6 +6,10 @@
       <span :class="['info-text', gameMode === 'Classic' ? 'mode-classic' : 'mode-infinite']">{{ gameMode }}</span>
     </div>
     <div class="info-item">
+      <span class="info-icon">👥</span>
+      <span :class="['info-text', Players === 'Single' ? 'mode-single' : 'mode-double']">{{ Players }}</span>
+    </div>
+    <div class="info-item">
       <span class="info-icon">🎨</span>
       <span class="info-text">Theme <span class="theme-badge">{{ themeNumber }}</span></span>
     </div>
@@ -22,7 +26,8 @@
 
           <div class="button-bar" v-if="isWasmLoaded">
             <button v-if="gameState === 0" @click="startGame" class="game-btn">▶ Start Game</button>
-            <button v-if="gameState === 0" @click="toggleMode" class="game-btn">🔄 Switch Mode</button>
+            <button v-if="gameState === 0" @click="toggleGameMode" class="game-btn">🔄 Switch Mode</button>
+            <button v-if="gameState === 0" @click="togglePlayer" class="game-btn">👥 Switch Player</button>
             <button v-if="gameState === 2" @click="resumeGame" class="game-btn">➡️ Resume Game</button>
             <button v-if="gameState === 2 || gameState === 3" @click="gotoMenu" class="game-btn">↩️ Back to Menu</button>
             <button v-if="gameState === 3" @click="restartGame" class="game-btn">🔄 Restart Game</button>
@@ -106,6 +111,7 @@ let observer = null
 
 // Game mode and theme number
 const gameMode = ref('Classic')
+const Players = ref('Single')
 const themeNumber = ref(1)
 
 // Snowflake count
@@ -135,8 +141,9 @@ window.onGameStateChange = (state) => {
   gameState.value = state
 }
 
-window.onModeThemeChange = (mode, themeIdx) => {
-  gameMode.value = mode === 0 ? 'Classic' : 'Infinite'
+window.onModeThemeChange = (game_mode, player, themeIdx) => {
+  gameMode.value = game_mode === 0 ? 'Classic' : 'Infinite'
+  Players.value = player === 0 ? 'Single' : 'Double'
   themeNumber.value = themeIdx
 }
 
@@ -167,9 +174,15 @@ function gotoMenu() {
   }
 }
 
-function toggleMode() {
-  if (pongModule && pongModule._toggle_mode) {
-    pongModule._toggle_mode()
+function toggleGameMode() {
+  if (pongModule && pongModule._toggle_game_mode) {
+    pongModule._toggle_game_mode()
+  }
+}
+
+function togglePlayer() {
+  if (pongModule && pongModule._toggle_player) {
+    pongModule._toggle_player()
   }
 }
 
@@ -401,10 +414,12 @@ onBeforeUnmount(() => {
   text-shadow: 0 0 2px #000;
 }
 
-.mode-classic {
+.mode-classic,
+.mode-single {
   color: #88c0ff;
 }
-.mode-infinite {
+.mode-infinite,
+.mode-double {
   color: #ffb86c;
 }
 

@@ -14,17 +14,15 @@
 #define TOTAL_TEXT (offsetof(Game, game_over_description) \
     - offsetof(Game, welcome_text)) / sizeof(Text) + 1
 
+#define INFINITE_MODE_MASK 0x01
+#define DOUBLE_PLAYER_MASK 0x02
+
 typedef enum {
     GAME_INIT,
     GAME_RUNNING,
     GAME_PAUSED,
     GAME_OVER
 } GameState;
-
-typedef enum {
-    MODE_CLASSIC = 0,
-    MODE_INFINITE = 1,
-} GameMode;
 
 #ifndef __EMSCRIPTEN__ // Browser probably not support double tap gesture
 
@@ -52,16 +50,19 @@ typedef struct {
 
     Text welcome_text;
     Text welcome_description;
+
     Text current_mode_classic;
     Text current_mode_infinite;
+
+    Text current_player_single;
+    Text current_player_double;
 
     Text paused_text;
 
     Text game_over_text;
     Text game_over_description;
 
-    GameMode mode;
-    bool is_single_player;
+    Uint8 mode_flags; // Flags for the game mode
 
     size_t score_to_win;
     size_t max_score;
@@ -90,7 +91,9 @@ typedef struct {
     X(welcome_text, welcome_description) \
     X(welcome_description, current_mode_classic) \
     X(current_mode_classic, current_mode_infinite) \
-    X(current_mode_infinite, paused_text) \
+    X(current_mode_infinite, current_player_single) \
+    X(current_player_single, current_player_double) \
+    X(current_player_double, paused_text) \
     X(paused_text, game_over_text) \
     X(game_over_text, game_over_description)
 

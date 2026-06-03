@@ -79,14 +79,30 @@ static void set_theme(Game *game)
 
 /* ===== Mode switch functions ====== */
 
-static void switch_mode(Game *game)
+static void switch_game_mode(Game *game)
 {
     if (game == NULL) return;
     if (game->state != GAME_INIT) return; // The game mode can only be switched when the game is in the init state
 
-    game->mode ^= MODE_INFINITE; // Toggle between classic and infinite mode
+    game->mode_flags ^= INFINITE_MODE_MASK; // Toggle between classic and infinite mode
 
-    game->score_to_win = (game->mode == MODE_INFINITE) ? INFINITE_WIN_SCORE : CLASSIC_WIN_SCORE;
+    game->score_to_win = (game->mode_flags & INFINITE_MODE_MASK) ? INFINITE_WIN_SCORE : CLASSIC_WIN_SCORE;
+
+#ifndef BENCHMARK_MODE
+    game->last_key_ticks = SDL_GetTicks(); // Refresh the UI
+
+#ifdef __EMSCRIPTEN__
+    notify_mode_theme();
+#endif
+#endif
+}
+
+static void switch_game_player(Game *game)
+{
+    if (game == NULL) return;
+    if (game->state != GAME_INIT) return; // The game mode can only be switched when the game is in the init state
+
+    game->mode_flags ^= DOUBLE_PLAYER_MASK;
 
 #ifndef BENCHMARK_MODE
     game->last_key_ticks = SDL_GetTicks(); // Refresh the UI
@@ -146,7 +162,7 @@ static void ai_control(Game *game, float dt)
 {
     if (game == NULL) return;
 
-    if (!game->is_single_player) return;
+    if (game->mode_flags & DOUBLE_PLAYER_MASK) return;
     if (game->state != GAME_RUNNING) return;
     if (game->ball.speed_x < 0) return; // The ball is moving to the left, no need to control
 
@@ -312,10 +328,14 @@ static void handle_key_down(Game *game, SDL_KeyboardEvent key)
         case SDL_SCANCODE_C:
             set_theme(game);
             break;
-        /* Switch the mode */
+        /* Switch the game mode */
         case SDL_SCANCODE_M:
-            switch_mode(game);
+            switch_game_mode(game);
             break;
+        /* Switch the game player */
+        case SDL_SCANCODE_P:
+            switch_game_player(game);
+            break;      
 
         /* Increase or decrease the snowflake count */
         case SDL_SCANCODE_B:
@@ -359,13 +379,23 @@ static void show_middle_line(Game *game)
     SDL_RenderFillRect(game->window_renderer, &(game->middle_line));
 }
 
-static void show_mode_screen(Game *game)
+static void show_game_mode_screen(Game *game)
 {
     if (game == NULL) return;
-    Text *mode_text = (game->mode == MODE_CLASSIC) ? &game->current_mode_classic : &game->current_mode_infinite;
+    Text *mode_text = (game->mode_flags & INFINITE_MODE_MASK) ? &game->current_mode_infinite : &game->current_mode_classic;
 
     render_text_texture(mode_text, game->window_renderer,
                              20,
+                             15);
+}
+
+static void show_player_screen(Game *game)
+{
+    if (game == NULL) return;
+    Text *player_text = (game->mode_flags & DOUBLE_PLAYER_MASK) ? &game->current_player_double : &game->current_player_single;
+
+    render_text_texture(player_text, game->window_renderer,
+                             WINDOW_WIDTH - WINDOW_BORDER_OFFSET - player_text->text_rect.w - 20,
                              15);
 }
 
@@ -444,7 +474,8 @@ static void render(Game *game)
     {
         case GAME_INIT:
             show_welcome_screen(game);
-            show_mode_screen(game);
+            show_game_mode_screen(game);
+            show_player_screen(game);
             break;
         case GAME_PAUSED:
             show_paused_screen(game);
@@ -631,6 +662,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     font_loaded &= create_text_texture(&game.current_mode_classic, FONT_PATH, "Classic Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
     font_loaded &= create_text_texture(&game.current_mode_infinite, FONT_PATH, "Infinite Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
 
+    font_loaded &= create_text_texture(&game.current_player_single, FONT_PATH, "Single Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(&game.current_player_double, FONT_PATH, "Double Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+
     font_loaded &= create_text_texture(&game.paused_text, FONT_PATH, "Paused", FONT_SIZE, game.window_renderer, FONT_COLOR);
 
     font_loaded &= create_text_texture(&game.game_over_text, FONT_PATH, "WIN", FONT_SIZE, game.window_renderer, FONT_COLOR);
@@ -670,9 +704,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 #endif
 
     /* Initialize game mode to classic mode */
-    game.mode = MODE_CLASSIC;
+    game.mode_flags = 0;
     game.score_to_win = CLASSIC_WIN_SCORE;
-    game.is_single_player = true;
 
     game.state = GAME_INIT;
     game.resume_delay_time = 0.0f;
@@ -719,10 +752,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     paddle_move(&game->left_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET, dt);
     
-    if (game->is_single_player)
-        ai_control(game, dt);
-    else
+    if (game->mode_flags & DOUBLE_PLAYER_MASK)
         paddle_move(&game->right_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET, dt);
+    else
+        ai_control(game, dt);
+        
 
     CollisionType collision = ball_collision(&game->ball, &game->left_paddle, &game->right_paddle,
                                 WINDOW_BORDER_OFFSET, WINDOW_WIDTH - WINDOW_BORDER_OFFSET,
@@ -861,11 +895,19 @@ void goto_menu(void)
 }
 
 EMSCRIPTEN_KEEPALIVE
-void toggle_mode(void)
+void toggle_game_mode(void)
 {
     if (game_ptr && game_ptr->state == GAME_INIT)
-        switch_mode(game_ptr);
+        switch_game_mode(game_ptr);
 }
+
+EMSCRIPTEN_KEEPALIVE
+void toggle_player(void)
+{
+    if (game_ptr && game_ptr->state == GAME_INIT)
+        switch_game_player(game_ptr);
+}
+
 
 EMSCRIPTEN_KEEPALIVE
 void set_snowflake_count(int count)
@@ -909,10 +951,12 @@ void report_wasm_frame(void)
 void notify_mode_theme(void)
 {
     if (game_ptr == NULL) return;
+    Uint8 game_mode = game_ptr->mode_flags & INFINITE_MODE_MASK;
+    Uint8 player = game_ptr->mode_flags & DOUBLE_PLAYER_MASK;
     EM_ASM({
         if (typeof window.onModeThemeChange === 'function')
-            window.onModeThemeChange($0, $1);
-    }, game_ptr->mode, game_ptr->theme_index + 1);
+            window.onModeThemeChange($0, $1, $2);
+    }, game_mode, player, game_ptr->theme_index + 1);
 }
 
 void notify_score_points(void)

@@ -90,10 +90,9 @@ static void set_theme(Game *game)
         themes + game->theme_index : themes + (game->theme_index + 1) % THEME_COUNT;
 
     /* Due to the Text fields are continuous, we can set the color of all Text fields at once */
-    Text *text_region = &game->welcome_text;
-    for (int i = 0; text_region <= &game->game_over_description && i < TOTAL_TEXT; i++)
+    for (int i = 0; i < TOTAL_TEXT; i++)
     {
-        bool is_colored = SDL_SetTextureColorMod(text_region->text_texture,
+        bool is_colored = SDL_SetTextureColorMod(game->texts[i].text_texture,
             game->theme->foreground[0],
             game->theme->foreground[1],
             game->theme->foreground[2]
@@ -101,7 +100,6 @@ static void set_theme(Game *game)
 
         if (!is_colored)
             fprintf(stderr, WARNING_TEXT " Failed to set color of text texture: %s\n", SDL_GetError());
-        text_region++;
     }
 
 #ifndef BENCHMARK_MODE
@@ -412,6 +410,19 @@ static void handle_key_down(Game *game, SDL_KeyboardEvent key)
     }
 }
 
+static void show_welcome_screen(Game *game)
+{
+    if (game == NULL) return;
+
+    render_text_texture(game->texts, game->window_renderer,
+                         (WINDOW_WIDTH - game->texts[0].text_rect.w) / 2,
+                         (WINDOW_HEIGHT - game->texts[0].text_rect.h) / 2 - 50);
+
+    render_text_texture(game->texts + 1, game->window_renderer,
+                         (WINDOW_WIDTH - game->texts[1].text_rect.w) / 2,
+                         (WINDOW_HEIGHT - game->texts[1].text_rect.h) / 2 + 50);
+}
+
 static void show_middle_line(Game *game)
 {
     if (game == NULL) return;
@@ -422,7 +433,7 @@ static void show_middle_line(Game *game)
 static void show_game_mode_screen(Game *game)
 {
     if (game == NULL) return;
-    Text *mode_text = (game->mode_flags & INFINITE_MODE_MASK) ? &game->current_mode_infinite : &game->current_mode_classic;
+    Text *mode_text = (game->mode_flags & INFINITE_MODE_MASK) ? game->texts + 2 : game->texts + 3;
 
     render_text_texture(mode_text, game->window_renderer,
                              20,
@@ -432,7 +443,7 @@ static void show_game_mode_screen(Game *game)
 static void show_player_screen(Game *game)
 {
     if (game == NULL) return;
-    Text *player_text = (game->mode_flags & DOUBLE_PLAYER_MASK) ? &game->current_player_double : &game->current_player_single;
+    Text *player_text = (game->mode_flags & DOUBLE_PLAYER_MASK) ? game->texts + 4 : game->texts + 5;
 
     render_text_texture(player_text, game->window_renderer,
                              WINDOW_WIDTH - WINDOW_BORDER_OFFSET - player_text->text_rect.w - 20,
@@ -444,13 +455,13 @@ static void show_player_screen(Game *game)
     switch (game->difficulty_index)
     {
         case 0:
-            ai_text = &game->ai_difficulty_simple;
+            ai_text = game->texts + 6;
             break;
         case 1:
-            ai_text = &game->ai_difficulty_medium;
+            ai_text = game->texts + 7;
             break;
         case 2:
-            ai_text = &game->ai_difficulty_hard;
+            ai_text = game->texts + 8;
             break;
         default:
             break;
@@ -461,26 +472,13 @@ static void show_player_screen(Game *game)
                             75);
 }
 
-static void show_welcome_screen(Game *game)
-{
-    if (game == NULL) return;
-
-    render_text_texture(&game->welcome_text, game->window_renderer,
-                         (WINDOW_WIDTH - game->welcome_text.text_rect.w) / 2,
-                         (WINDOW_HEIGHT - game->welcome_text.text_rect.h) / 2 - 50);
-
-    render_text_texture(&game->welcome_description, game->window_renderer,
-                         (WINDOW_WIDTH - game->welcome_description.text_rect.w) / 2,
-                         (WINDOW_HEIGHT - game->welcome_description.text_rect.h) / 2 + 50);
-}
-
 static void show_paused_screen(Game *game)
 {
     if (game == NULL) return;
 
-    render_text_texture(&game->paused_text, game->window_renderer,
+    render_text_texture(game->texts + 9, game->window_renderer,
                              20,
-                             (WINDOW_HEIGHT - game->paused_text.text_rect.h) - 15);
+                             (WINDOW_HEIGHT - game->texts[9].text_rect.h) - 15);
 }
 
 static void show_game_screen(Game *game)
@@ -500,22 +498,22 @@ static void show_game_over_screen(Game *game)
     float desc_pos_x = 0;
     if (game->left_score > game->right_score)
     {
-        msg_pos_x = (WINDOW_WIDTH - game->game_over_text.text_rect.w) / 5;
-        desc_pos_x = (WINDOW_WIDTH - game->game_over_description.text_rect.w) / 8;
+        msg_pos_x = (WINDOW_WIDTH - game->texts[10].text_rect.w) / 5;
+        desc_pos_x = (WINDOW_WIDTH - game->texts[11].text_rect.w) / 8;
     }
     else
     {
-        msg_pos_x = (WINDOW_WIDTH - game->game_over_text.text_rect.w) * 4 / 5;
-        desc_pos_x = (WINDOW_WIDTH - game->game_over_description.text_rect.w) * 7 / 8;
+        msg_pos_x = (WINDOW_WIDTH - game->texts[10].text_rect.w) * 4 / 5;
+        desc_pos_x = (WINDOW_WIDTH - game->texts[11].text_rect.w) * 7 / 8;
     }
 
-    render_text_texture(&game->game_over_text, game->window_renderer,
+    render_text_texture(&game->texts[10], game->window_renderer,
                          msg_pos_x,
-                         (WINDOW_HEIGHT - game->game_over_text.text_rect.h) / 2 - 50);
+                         (WINDOW_HEIGHT - game->texts[10].text_rect.h) / 2 - 50);
 
-    render_text_texture(&game->game_over_description, game->window_renderer,
+    render_text_texture(&game->texts[11], game->window_renderer,
                          desc_pos_x,
-                         (WINDOW_HEIGHT - game->game_over_description.text_rect.h) / 2 + 50);
+                         (WINDOW_HEIGHT - game->texts[11].text_rect.h) / 2 + 50);
 }
 
 static void render(Game *game)
@@ -714,27 +712,27 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     /* Load font */
     bool font_loaded = true;
 
-    font_loaded &= create_text_texture(&game.welcome_text, FONT_PATH, "Welcome to Pong", FONT_SIZE, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts, FONT_PATH, "Welcome to Pong", FONT_SIZE, game.window_renderer, FONT_COLOR);
 
 #ifdef __EMSCRIPTEN__
-    font_loaded &= create_text_texture(&game.welcome_description, FONT_PATH, "Press SPACE or click start button", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts, FONT_PATH, "Press SPACE or click start button", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
 #else
-    font_loaded &= create_text_texture(&game.welcome_description, FONT_PATH, "Press [SPACE] to start", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 1, FONT_PATH, "Press [SPACE] to start", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
 #endif
-    font_loaded &= create_text_texture(&game.current_mode_classic, FONT_PATH, "Classic Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(&game.current_mode_infinite, FONT_PATH, "Infinite Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 2, FONT_PATH, "Classic Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 3, FONT_PATH, "Infinite Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
 
-    font_loaded &= create_text_texture(&game.current_player_single, FONT_PATH, "Single Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(&game.current_player_double, FONT_PATH, "Double Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 4, FONT_PATH, "Single Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 5, FONT_PATH, "Double Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
 
-    font_loaded &= create_text_texture(&game.ai_difficulty_simple, FONT_PATH, "Simple", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(&game.ai_difficulty_medium, FONT_PATH, "Medium", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(&game.ai_difficulty_hard, FONT_PATH, "Hard", FONT_SIZE - 16, game.window_renderer, FONT_COLOR); 
+    font_loaded &= create_text_texture(game.texts + 6, FONT_PATH, "Simple", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 7, FONT_PATH, "Medium", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 8, FONT_PATH, "Hard", FONT_SIZE - 16, game.window_renderer, FONT_COLOR); 
 
-    font_loaded &= create_text_texture(&game.paused_text, FONT_PATH, "Paused", FONT_SIZE, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 9, FONT_PATH, "Paused", FONT_SIZE, game.window_renderer, FONT_COLOR);
 
-    font_loaded &= create_text_texture(&game.game_over_text, FONT_PATH, "WIN", FONT_SIZE, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(&game.game_over_description, FONT_PATH, "Press [space] to restart", FONT_SIZE - 36, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 10, FONT_PATH, "WIN", FONT_SIZE, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 11, FONT_PATH, "Press [space] to restart", FONT_SIZE - 36, game.window_renderer, FONT_COLOR);
 
     if (!font_loaded)
         return SDL_APP_FAILURE;
@@ -902,11 +900,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     if (game->snow.snow_sprite)
         SDL_DestroyTexture(game->snow.snow_sprite);
 
-    destroy_text_texture(&game->welcome_text);
-    destroy_text_texture(&game->welcome_description);
-    destroy_text_texture(&game->paused_text);
-    destroy_text_texture(&game->game_over_text);
-    destroy_text_texture(&game->game_over_description);
+    for (int i = 0; i < TOTAL_TEXT; i++)
+        destroy_text_texture(game->texts + i);
 
     TTF_Quit();
 

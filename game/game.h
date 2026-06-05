@@ -11,8 +11,7 @@
 #include "snow.h"
 #include "themes.h"
 
-#define TOTAL_TEXT (offsetof(Game, game_over_description) \
-    - offsetof(Game, welcome_text)) / sizeof(Text) + 1
+#define TOTAL_TEXT 12
 
 #define INFINITE_MODE_MASK 0x01
 #define DOUBLE_PLAYER_MASK 0x02
@@ -50,23 +49,22 @@ typedef struct {
 
     Snow snow;
 
-    Text welcome_text;
-    Text welcome_description;
-
-    Text current_mode_classic;
-    Text current_mode_infinite;
-
-    Text current_player_single;
-    Text current_player_double;
-
-    Text ai_difficulty_simple;
-    Text ai_difficulty_medium;
-    Text ai_difficulty_hard;
-
-    Text paused_text;
-
-    Text game_over_text;
-    Text game_over_description;
+    Text texts[TOTAL_TEXT];
+    /*
+        The text array contains the following texts:
+        [0]: Welcome to Pong
+        [1]: Press [SPACE] to start
+        [2]: Classic Mode
+        [3]: Infinite Mode
+        [4]: Single Player
+        [5]: Double Player
+        [6]: Simple
+        [7]: Medium
+        [8]: Hard
+        [9]: Paused
+        [10]: WIN
+        [11]: Press [space] to restart
+    */
 
     Uint8 mode_flags; // Flags for the game mode
 
@@ -93,26 +91,5 @@ typedef struct {
     Uint64 last_key_ticks;
 #endif
 } Game;
-
-/* Make sure the Text fields are continuous */
-#define TEXT_FIELDS \
-    X(welcome_text, welcome_description) \
-    X(welcome_description, current_mode_classic) \
-    X(current_mode_classic, current_mode_infinite) \
-    X(current_mode_infinite, current_player_single) \
-    X(current_player_single, current_player_double) \
-    X(current_player_double, ai_difficulty_simple) \
-    X(ai_difficulty_simple, ai_difficulty_medium) \
-    X(ai_difficulty_medium, ai_difficulty_hard) \
-    X(ai_difficulty_hard, paused_text) \
-    X(paused_text, game_over_text) \
-    X(game_over_text, game_over_description)
-
-#define X(curr, next) \
-    static_assert(offsetof(Game, next) == \
-        (offsetof(Game, curr) + sizeof(Text)), \
-        "\'"#curr" -> "#next"\' is NOT continuous");
-TEXT_FIELDS
-#undef X
 
 #endif // GAME_H

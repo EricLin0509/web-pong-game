@@ -18,7 +18,7 @@
 #define WINDOW_BORDER_OFFSET 10
 #define WINDOW_TITLE "Pong"
 #define LINE_WIDTH 2
-#define AI_MISTAKE ((float)rand() / (float)RAND_MAX * 300.0f - 150.0f) // [-150, 150] for the AI to make some mistakes
+#define NUM_AI_DIFFICULTY 3
 
 #define CLASSIC_WIN_SCORE 11
 #define INFINITE_WIN_SCORE SIZE_MAX // Use SIZE_MAX to represent infinity
@@ -41,6 +41,42 @@ void notify_game_state(void);
 void store_score_history(void);
 #endif
 #endif
+
+/* ===== AI Difficulty Functions ====== */
+
+static inline float easy_ai_difficulty(void)
+{
+    return (float)rand() / (float)RAND_MAX * 1000.0f - 500.0f; // [-500, 500]
+}
+
+static inline float medium_ai_difficulty(void)
+{
+    return (float)rand() / (float)RAND_MAX * 300.0f - 150.0f; // [-150, 150]
+}
+
+static inline float hard_ai_difficulty(void)
+{
+    return (float)rand() / (float)RAND_MAX * 100.0f - 50.0f; // [-50, 50]
+}
+
+static ai_difficulty_func selections[NUM_AI_DIFFICULTY] = {
+    easy_ai_difficulty,
+    medium_ai_difficulty,
+    hard_ai_difficulty
+};
+
+static void set_ai_difficulty(Game *game)
+{
+    if (game == NULL) return;
+    if (game->state != GAME_INIT || game->mode_flags & DOUBLE_PLAYER_MASK) return;
+
+    game->difficulty_index = (game->difficulty_index + 1) % NUM_AI_DIFFICULTY;
+    game->difficulty = selections[game->difficulty_index]; // Set the difficulty function
+
+#ifndef BENCHMARK_MODE
+    game->last_key_ticks = SDL_GetTicks(); // Refresh the UI
+#endif
+}
 
 /* ===== Theme Functions ====== */
 
@@ -192,7 +228,7 @@ static void ai_control(Game *game, float dt)
     if (frame_counter >= 30)
     {
         frame_counter = 0;
-        mistake = AI_MISTAKE;   // [-150, 150]
+        mistake = game->difficulty();
     }
 
     float target_y = predicted_y - ai_paddle->paddle_rect.h / 2 + mistake;
@@ -335,7 +371,11 @@ static void handle_key_down(Game *game, SDL_KeyboardEvent key)
         /* Switch the game player */
         case SDL_SCANCODE_P:
             switch_game_player(game);
-            break;      
+            break;
+        /* Switch AI difficulty */
+        case SDL_SCANCODE_D:
+            set_ai_difficulty(game);
+            break;
 
         /* Increase or decrease the snowflake count */
         case SDL_SCANCODE_B:
@@ -397,6 +437,28 @@ static void show_player_screen(Game *game)
     render_text_texture(player_text, game->window_renderer,
                              WINDOW_WIDTH - WINDOW_BORDER_OFFSET - player_text->text_rect.w - 20,
                              15);
+
+    if (game->mode_flags & DOUBLE_PLAYER_MASK) return;
+
+    Text *ai_text = NULL;
+    switch (game->difficulty_index)
+    {
+        case 0:
+            ai_text = &game->ai_difficulty_simple;
+            break;
+        case 1:
+            ai_text = &game->ai_difficulty_medium;
+            break;
+        case 2:
+            ai_text = &game->ai_difficulty_hard;
+            break;
+        default:
+            break;
+    }
+
+    render_text_texture(ai_text, game->window_renderer,
+                            WINDOW_WIDTH - WINDOW_BORDER_OFFSET - ai_text->text_rect.w - 20,
+                            75);
 }
 
 static void show_welcome_screen(Game *game)
@@ -665,6 +727,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     font_loaded &= create_text_texture(&game.current_player_single, FONT_PATH, "Single Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
     font_loaded &= create_text_texture(&game.current_player_double, FONT_PATH, "Double Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
 
+    font_loaded &= create_text_texture(&game.ai_difficulty_simple, FONT_PATH, "Simple", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(&game.ai_difficulty_medium, FONT_PATH, "Medium", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(&game.ai_difficulty_hard, FONT_PATH, "Hard", FONT_SIZE - 16, game.window_renderer, FONT_COLOR); 
+
     font_loaded &= create_text_texture(&game.paused_text, FONT_PATH, "Paused", FONT_SIZE, game.window_renderer, FONT_COLOR);
 
     font_loaded &= create_text_texture(&game.game_over_text, FONT_PATH, "WIN", FONT_SIZE, game.window_renderer, FONT_COLOR);
@@ -683,6 +749,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     /* Initialize snow sprite */
     if (!init_snow(&game.snow, game.window_renderer))
         return SDL_APP_FAILURE;
+
+    /* Initialize AI difficulty */
+    game.difficulty = selections[0];
+    game.difficulty_index = 0;
 
     /* Initialize theme */
     set_theme(&game);

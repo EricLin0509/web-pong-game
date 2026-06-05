@@ -35,6 +35,8 @@ typedef struct {
 
 #endif
 
+typedef float (*ai_difficulty_func)(void);
+
 typedef struct {
     SDL_Window *window;
     SDL_FRect window_boarder;
@@ -57,6 +59,10 @@ typedef struct {
     Text current_player_single;
     Text current_player_double;
 
+    Text ai_difficulty_simple;
+    Text ai_difficulty_medium;
+    Text ai_difficulty_hard;
+
     Text paused_text;
 
     Text game_over_text;
@@ -72,6 +78,8 @@ typedef struct {
     GameState state;
     Uint8 theme_index; // Index of the current theme
     Theme const *theme;
+    Uint8 difficulty_index;
+    ai_difficulty_func difficulty;
 
 #ifndef __EMSCRIPTEN__
     LastTap last_tap;
@@ -93,7 +101,10 @@ typedef struct {
     X(current_mode_classic, current_mode_infinite) \
     X(current_mode_infinite, current_player_single) \
     X(current_player_single, current_player_double) \
-    X(current_player_double, paused_text) \
+    X(current_player_double, ai_difficulty_simple) \
+    X(ai_difficulty_simple, ai_difficulty_medium) \
+    X(ai_difficulty_medium, ai_difficulty_hard) \
+    X(ai_difficulty_hard, paused_text) \
     X(paused_text, game_over_text) \
     X(game_over_text, game_over_description)
 

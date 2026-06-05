@@ -11,11 +11,11 @@ void paddle_init(Paddle *paddle, int x, int y, int width, int height)
     paddle->direction = PADDLE_STOP;
 }
 
-void paddle_move(Paddle *paddle, uint32_t min_y, uint32_t max_y, float dt)
+void paddle_move(Paddle *paddle, uint32_t min_y, uint32_t max_y, float speed, float dt)
 {
     if (paddle == NULL) return;
 
-    float actual_distance = PADDLE_SPEED_PER_SEC * dt;
+    float actual_distance = speed * dt;
 
     switch (paddle->direction)
     {

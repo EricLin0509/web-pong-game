@@ -26,7 +26,7 @@ typedef struct {
 void paddle_init(Paddle *paddle, int x, int y, int width, int height);
 
 /* @note: No need to minus the paddle height in the collision check, It already included */
-void paddle_move(Paddle *paddle, uint32_t min_y, uint32_t max_y, float dt);
+void paddle_move(Paddle *paddle, uint32_t min_y, uint32_t max_y, float speed, float dt);
 
 /* The touch version of the paddle move function */
 void paddle_move_touch(Paddle *paddle, uint32_t min_y, uint32_t max_y, float delta_y);

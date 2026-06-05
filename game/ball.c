@@ -2,7 +2,28 @@
 
 #include "ball.h"
 
-#define MAX_BOUNCE_ANGLE 300.0f 
+#define MAX_BOUNCE_ANGLE 300.0f
+
+float initial_speed_easy(void)
+{
+    return (float)rand() / (float)RAND_MAX * 50.0f + 350.0f; // [350, 400]
+}
+
+float initial_speed_medium(void)
+{
+    return (float)rand() / (float)RAND_MAX * 100.0f + 400.0f; // [400, 500]
+}
+
+float initial_speed_hard(void)
+{
+    return (float)rand() / (float)RAND_MAX * 150.0f + 500.0f; // [500, 650]
+}
+
+static const initial_speed_generator generators[3] = {
+    initial_speed_easy,
+    initial_speed_medium,
+    initial_speed_hard
+};
 
 void ball_init(Ball *ball, float x, float y, int width, int height)
 {
@@ -12,9 +33,11 @@ void ball_init(Ball *ball, float x, float y, int width, int height)
     ball->rect.y = ball->orig_y = y;
     ball->rect.w = width;
     ball->rect.h = height;
+
+    ball->generator = generators[0];
     
-    ball->speed_x = (SHOUD_MOVE_REVERSE) ? -INITIAL_SPEED_PER_SEC : INITIAL_SPEED_PER_SEC;
-    ball->speed_y = (SHOUD_MOVE_REVERSE) ? -INITIAL_SPEED_PER_SEC + 100.0f : INITIAL_SPEED_PER_SEC - 100.0f;
+    ball->speed_x = (SHOUD_MOVE_REVERSE) ? -(ball->generator()) : (ball->generator());
+    ball->speed_y = (SHOUD_MOVE_REVERSE) ? -(ball->generator()) + 200.0f : (ball->generator()) - 200.0f;
 }
 
 void reset_ball(Ball *ball, bool left_serve)
@@ -23,9 +46,20 @@ void reset_ball(Ball *ball, bool left_serve)
 
     ball->rect.x = ball->orig_x;
     ball->rect.y = ball->orig_y;
-    float speed_x = INITIAL_SPEED_PER_SEC;
-    ball->speed_x = (left_serve) ? -speed_x : speed_x;
-    ball->speed_y = (SHOUD_MOVE_REVERSE) ? INITIAL_SPEED_PER_SEC : -INITIAL_SPEED_PER_SEC;
+    ball->speed_x = (left_serve) ? -(ball->generator()) : (ball->generator());
+    ball->speed_y = (SHOUD_MOVE_REVERSE) ? -(ball->generator()) + 200.0f : (ball->generator()) - 200.0f;
+}
+
+void set_ball_difficulty(Ball *ball, Uint8 index)
+{
+    if (ball == NULL) return;
+
+    if (index < 3)
+        ball->generator = generators[index];
+
+    /* Update ball speed based on difficulty */
+    ball->speed_x = (SHOUD_MOVE_REVERSE) ? -(ball->generator()) : (ball->generator());
+    ball->speed_y = (SHOUD_MOVE_REVERSE) ? -(ball->generator()) + 200.0f : (ball->generator()) - 200.0f;
 }
 
 CollisionType ball_collision(Ball *ball, Paddle *left_paddle, Paddle *right_paddle,

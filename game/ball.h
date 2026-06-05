@@ -7,9 +7,8 @@
 #include "paddle.h"
 
 #define BALL_SIZE 20.0f
-#define INITIAL_SPEED_PER_SEC ((float)rand() / (float)RAND_MAX * 50.0f + 350.0f) // [350, 400]
 #define JITTER_PER_SEC ((float)rand() / (float)RAND_MAX * 10.0f + 10.0f) // [10, 20]
-#define MAX_SPEED 1000.0f
+#define MAX_SPEED 1500.0f
 #define SHOUD_MOVE_REVERSE ((rand() & 1) == 0)
 
 typedef enum {
@@ -18,8 +17,11 @@ typedef enum {
     COLLISION_RIGHT // Hit the right wall, left player wins
 } CollisionType;
 
+typedef float (*initial_speed_generator) (void);
+
 typedef struct {
     SDL_FRect rect;
+    initial_speed_generator generator;
     float orig_x;
     float orig_y;
     float speed_x;
@@ -30,7 +32,7 @@ void ball_init(Ball *ball, float x, float y, int width, int height);
 
 void reset_ball(Ball *ball, bool left_serve);
 
-void speed_up_ball(Ball *ball);
+void set_ball_difficulty(Ball *ball, Uint8 index);
 
 /* @note: No need to minus the ball size in the collision check, It already included */
 CollisionType ball_collision(Ball *ball, Paddle *left_paddle, Paddle *right_paddle,

@@ -18,7 +18,7 @@
 #define WINDOW_BORDER_OFFSET 10
 #define WINDOW_TITLE "Pong"
 #define LINE_WIDTH 2
-#define NUM_AI_DIFFICULTY 3
+#define NUM_DIFFICULTY 3
 
 #define CLASSIC_WIN_SCORE 11
 #define INFINITE_WIN_SCORE SIZE_MAX // Use SIZE_MAX to represent infinity
@@ -59,23 +59,24 @@ static inline float hard_ai_difficulty(void)
     return (float)rand() / (float)RAND_MAX * 100.0f - 50.0f; // [-50, 50]
 }
 
-static ai_difficulty_func selections[NUM_AI_DIFFICULTY] = {
+static const ai_difficulty_func selections[NUM_DIFFICULTY] = {
     easy_ai_difficulty,
     medium_ai_difficulty,
     hard_ai_difficulty
 };
 
-static void set_ai_difficulty(Game *game)
+static const float paddle_move_scale[NUM_DIFFICULTY] = {
+    0.8f,
+    1.0f,
+    1.2f
+};
+
+static void set_ai_difficulty(ai_difficulty_func *difficulty, Uint8 index)
 {
-    if (game == NULL) return;
-    if (game->state != GAME_INIT || game->mode_flags & DOUBLE_PLAYER_MASK) return;
+    if (difficulty == NULL) return;
 
-    game->difficulty_index = (game->difficulty_index + 1) % NUM_AI_DIFFICULTY;
-    game->difficulty = selections[game->difficulty_index]; // Set the difficulty function
-
-#ifndef BENCHMARK_MODE
-    game->last_key_ticks = SDL_GetTicks(); // Refresh the UI
-#endif
+    if (index < NUM_DIFFICULTY)
+        *difficulty = selections[index]; // Set the difficulty function
 }
 
 /* ===== Theme Functions ====== */
@@ -147,6 +148,20 @@ static void switch_game_player(Game *game)
 #endif
 }
 
+static void switch_difficulty(Game *game)
+{
+    if (game == NULL) return;
+    if (game->state != GAME_INIT) return; // The game mode can only be switched when the game is in the init state
+
+    game->difficulty_index = (game->difficulty_index + 1) % NUM_DIFFICULTY;
+    set_ai_difficulty(&game->difficulty, game->difficulty_index);
+    set_ball_difficulty(&game->ball, game->difficulty_index);
+
+#ifndef BENCHMARK_MODE
+    game->last_key_ticks = SDL_GetTicks(); // Refresh the UI
+#endif
+}
+
 /*====== Game Logics ======*/
 
 static void game_reset(Game *game)
@@ -208,7 +223,7 @@ static void ai_control(Game *game, float dt)
     float time = delta_x / game->ball.speed_x;
     if (time <= 0) return;
 
-    float predicted_y = game->ball.rect.y + game->ball.speed_y * time;;
+    float predicted_y = game->ball.rect.y + game->ball.speed_y * time;
 
     /* Fix the prediction when bounce back between up and down */
     while (predicted_y < WINDOW_BORDER_OFFSET || predicted_y > WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - BALL_SIZE)
@@ -234,7 +249,7 @@ static void ai_control(Game *game, float dt)
                          WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - ai_paddle->paddle_rect.h);
 
     float diff = target_y - ai_paddle->paddle_rect.y;
-    float move = PADDLE_SPEED_PER_SEC * dt;
+    float move = PADDLE_SPEED_PER_SEC * dt * paddle_move_scale[game->difficulty_index];
 
     // Move the paddle the diff is big enough to prevent paddle shaking
     if (fabsf(diff) < 1.5f) return;
@@ -256,7 +271,11 @@ static void handle_touch(Game *game, SDL_TouchFingerEvent finger)
     float x = finger.x * WINDOW_WIDTH;
     float delta_y = finger.dy * WINDOW_HEIGHT;
 
-    Paddle *chosen_paddle = x < WINDOW_WIDTH / 2 ? &game->left_paddle : &game->right_paddle;
+    Paddle *chosen_paddle = NULL;
+    if (game->mode_flags & DOUBLE_PLAYER_MASK)
+        chosen_paddle = x < WINDOW_WIDTH / 2 ? &game->left_paddle : &game->right_paddle;
+    else
+        chosen_paddle = &game->left_paddle; // In single player mode, only the left paddle can be controlled
 
     paddle_move_touch(chosen_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET, delta_y);
 }
@@ -372,7 +391,7 @@ static void handle_key_down(Game *game, SDL_KeyboardEvent key)
             break;
         /* Switch AI difficulty */
         case SDL_SCANCODE_D:
-            set_ai_difficulty(game);
+            switch_difficulty(game);
             break;
 
         /* Increase or decrease the snowflake count */
@@ -438,38 +457,36 @@ static void show_game_mode_screen(Game *game)
     render_text_texture(mode_text, game->window_renderer,
                              20,
                              15);
-}
 
-static void show_player_screen(Game *game)
-{
-    if (game == NULL) return;
-    Text *player_text = (game->mode_flags & DOUBLE_PLAYER_MASK) ? game->texts + 4 : game->texts + 5;
-
-    render_text_texture(player_text, game->window_renderer,
-                             WINDOW_WIDTH - WINDOW_BORDER_OFFSET - player_text->text_rect.w - 20,
-                             15);
-
-    if (game->mode_flags & DOUBLE_PLAYER_MASK) return;
-
-    Text *ai_text = NULL;
+    Text *difficulty_text = NULL;
     switch (game->difficulty_index)
     {
         case 0:
-            ai_text = game->texts + 6;
+            difficulty_text = game->texts + 6;
             break;
         case 1:
-            ai_text = game->texts + 7;
+            difficulty_text = game->texts + 7;
             break;
         case 2:
-            ai_text = game->texts + 8;
+            difficulty_text = game->texts + 8;
             break;
         default:
             break;
     }
 
-    render_text_texture(ai_text, game->window_renderer,
-                            WINDOW_WIDTH - WINDOW_BORDER_OFFSET - ai_text->text_rect.w - 20,
+    render_text_texture(difficulty_text, game->window_renderer,
+                            20,
                             75);
+}
+
+static void show_player_screen(Game *game)
+{
+    if (game == NULL) return;
+    Text *player_text = (game->mode_flags & DOUBLE_PLAYER_MASK) ? game->texts + 5 : game->texts + 4;
+
+    render_text_texture(player_text, game->window_renderer,
+                             WINDOW_WIDTH - WINDOW_BORDER_OFFSET - player_text->text_rect.w - 20,
+                             15);
 }
 
 static void show_paused_screen(Game *game)
@@ -715,7 +732,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     font_loaded &= create_text_texture(game.texts, FONT_PATH, "Welcome to Pong", FONT_SIZE, game.window_renderer, FONT_COLOR);
 
 #ifdef __EMSCRIPTEN__
-    font_loaded &= create_text_texture(game.texts, FONT_PATH, "Press SPACE or click start button", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 1, FONT_PATH, "Press SPACE or click start button", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
 #else
     font_loaded &= create_text_texture(game.texts + 1, FONT_PATH, "Press [SPACE] to start", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
 #endif
@@ -818,10 +835,12 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     if (game->state != GAME_RUNNING)
         return SDL_APP_CONTINUE;
 
-    paddle_move(&game->left_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET, dt);
+    paddle_move(&game->left_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET,
+                PADDLE_SPEED_PER_SEC * paddle_move_scale[game->difficulty_index], dt);
     
     if (game->mode_flags & DOUBLE_PLAYER_MASK)
-        paddle_move(&game->right_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET, dt);
+        paddle_move(&game->right_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET,
+                PADDLE_SPEED_PER_SEC * paddle_move_scale[game->difficulty_index], dt);
     else
         ai_control(game, dt);
         

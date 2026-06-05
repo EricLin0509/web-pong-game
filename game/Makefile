@@ -3,7 +3,7 @@ CC_WASM=emcc
 CFLAGS=-Wall -Werror
 EXE_CFLAGS= -lm -lSDL3 -lSDL3_ttf
 WASM_CFLAGS= -Wno-experimental -sUSE_SDL=3 -sUSE_SDL_TTF=3 -sUSE_FREETYPE=1
-EXPORTED_FUNCTIONS = -sEXPORTED_FUNCTIONS="['_main', '_start_game', '_pause_game', '_resume_game', '_restart_game', '_goto_menu', '_toggle_theme', '_toggle_game_mode', '_toggle_player', '_set_snowflake_count']"
+EXPORTED_FUNCTIONS = -sEXPORTED_FUNCTIONS="['_main', '_start_game', '_pause_game', '_resume_game', '_restart_game', '_goto_menu', '_toggle_theme', '_toggle_game_mode', '_toggle_player', '_toggle_difficulty', '_set_snowflake_count']"
 OUT=pong
 SRC=paddle.c ball.c snow.c text.c main.c
 

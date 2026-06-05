@@ -46,17 +46,17 @@ void store_score_history(void);
 
 static inline float easy_ai_difficulty(void)
 {
-    return (float)rand() / (float)RAND_MAX * 1000.0f - 500.0f; // [-500, 500]
+    return (float)rand() / (float)RAND_MAX * 160.0f - 80.0f; // [-80, 80]
 }
 
 static inline float medium_ai_difficulty(void)
 {
-    return (float)rand() / (float)RAND_MAX * 300.0f - 150.0f; // [-150, 150]
+    return (float)rand() / (float)RAND_MAX * 80.0f - 40.0f; // [-40, 40]
 }
 
 static inline float hard_ai_difficulty(void)
 {
-    return (float)rand() / (float)RAND_MAX * 100.0f - 50.0f; // [-50, 50]
+    return (float)rand() / (float)RAND_MAX * 20.0f - 10.0f; // [-10, 10]
 }
 
 static const ai_difficulty_func selections[NUM_DIFFICULTY] = {
@@ -159,6 +159,10 @@ static void switch_difficulty(Game *game)
 
 #ifndef BENCHMARK_MODE
     game->last_key_ticks = SDL_GetTicks(); // Refresh the UI
+
+#ifdef __EMSCRIPTEN__
+    notify_mode_theme();
+#endif
 #endif
 }
 
@@ -452,7 +456,7 @@ static void show_middle_line(Game *game)
 static void show_game_mode_screen(Game *game)
 {
     if (game == NULL) return;
-    Text *mode_text = (game->mode_flags & INFINITE_MODE_MASK) ? game->texts + 2 : game->texts + 3;
+    Text *mode_text = (game->mode_flags & INFINITE_MODE_MASK) ? game->texts + 3 : game->texts + 2;
 
     render_text_texture(mode_text, game->window_renderer,
                              20,
@@ -999,6 +1003,13 @@ void toggle_player(void)
         switch_game_player(game_ptr);
 }
 
+EMSCRIPTEN_KEEPALIVE
+void toggle_difficulty(void)
+{
+    if (game_ptr && game_ptr->state == GAME_INIT)
+        switch_difficulty(game_ptr);
+}
+
 
 EMSCRIPTEN_KEEPALIVE
 void set_snowflake_count(int count)
@@ -1046,8 +1057,8 @@ void notify_mode_theme(void)
     Uint8 player = game_ptr->mode_flags & DOUBLE_PLAYER_MASK;
     EM_ASM({
         if (typeof window.onModeThemeChange === 'function')
-            window.onModeThemeChange($0, $1, $2);
-    }, game_mode, player, game_ptr->theme_index + 1);
+            window.onModeThemeChange($0, $1, $2, $3);
+    }, game_mode, player, game_ptr->difficulty_index, game_ptr->theme_index + 1);
 }
 
 void notify_score_points(void)

@@ -10,6 +10,10 @@
       <span :class="['info-text', Players === 'Single' ? 'mode-single' : 'mode-double']">{{ Players }}</span>
     </div>
     <div class="info-item">
+      <span class="info-icon">🎯</span>
+      <span :class="['info-text', `difficulty-${difficulty.toLowerCase()}`]">{{ difficulty }}</span>
+    </div>
+    <div class="info-item">
       <span class="info-icon">🎨</span>
       <span class="info-text">Theme <span class="theme-badge">{{ themeNumber }}</span></span>
     </div>
@@ -26,18 +30,29 @@
 
           <div class="button-bar" v-if="isWasmLoaded">
 
-            <div v-if="gameState === 0" class="button-group">
-              <div class="button-row big-row">
-                <button @click="startGame" class="game-btn game-btn-start">▶ Start Game</button>
-              </div>
-              <div class="button-row big-row">
+          <div v-if="gameState === 0" class="button-group">
+
+            <div class="button-row big-row">
+              <button @click="startGame" class="game-btn game-btn-start">▶ Start Game</button>
+            </div>
+
+            <div class="button-row big-row">
+              <button @click="showSettings = !showSettings" class="game-btn">
+                ⚙️ {{ showSettings ? 'Close Settings' : 'Settings' }}
+              </button>
+            </div>
+
+            <div v-if="showSettings" class="settings-panel">
+              <div class="settings-row">
                 <button @click="toggleGameMode" class="game-btn">🔄 Switch Mode</button>
-              </div>
-              <div class="button-row other-row">
                 <button @click="togglePlayer" class="game-btn">👥 Switch Player</button>
+              </div>
+              <div class="settings-row">
+                <button @click="toggleDifficulty" class="game-btn">🎯 Change Difficulty</button>
                 <button @click="toggleTheme" class="game-btn">🎨 Change Theme</button>
               </div>
             </div>
+          </div>
 
             <div v-if="gameState === 2" class="button-row">
               <button @click="resumeGame" class="game-btn">➡️ Resume Game</button>
@@ -107,6 +122,8 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { loadWasm } from '../composables/useWasm.js'
 
+const showSettings = ref(false)
+
 // History records
 const historyRecords = ref([])
 
@@ -129,6 +146,7 @@ let observer = null
 // Game mode and theme number
 const gameMode = ref('Classic')
 const Players = ref('Single')
+const difficulty = ref('Simple')
 const themeNumber = ref(1)
 
 // Snowflake count
@@ -158,9 +176,23 @@ window.onGameStateChange = (state) => {
   gameState.value = state
 }
 
-window.onModeThemeChange = (game_mode, player, themeIdx) => {
+window.onModeThemeChange = (game_mode, player, DifficultyIdx, themeIdx) => {
   gameMode.value = game_mode === 0 ? 'Classic' : 'Infinite'
   Players.value = player === 0 ? 'Single' : 'Double'
+  switch (DifficultyIdx) {
+    case 0:
+      difficulty.value = 'Simple'
+      break
+    case 1:
+      difficulty.value = 'Medium'
+      break
+    case 2:
+      difficulty.value = 'Hard'
+      break
+    default:
+      difficulty.value = 'Unknown'
+      break
+  }
   themeNumber.value = themeIdx
 }
 
@@ -188,6 +220,12 @@ function restartGame() {
 function gotoMenu() {
   if (pongModule && pongModule._goto_menu) {
     pongModule._goto_menu()
+  }
+}
+
+function toggleDifficulty() {
+  if (pongModule && pongModule._toggle_difficulty) {
+    pongModule._toggle_difficulty()
   }
 }
 
@@ -446,6 +484,16 @@ onBeforeUnmount(() => {
   color: #ffb86c;
 }
 
+.difficulty-simple {
+  color: #4caf50;
+}
+.difficulty-medium {
+  color: #ffc107;
+}
+.difficulty-hard {
+  color: #f44336;
+}
+
 .theme-badge {
   background: rgba(0,0,0,0.5);
   border-radius: 20px;
@@ -547,6 +595,36 @@ canvas {
   flex-direction: column;
   gap: 12px;
   width: 100%;
+}
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  align-items: center;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.settings-row {
+  width: 80%;
+  max-width: 400px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  justify-items: center
+}
+
+.settings-row .game-btn {
+  width: 100%;
+  white-space: nowrap;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .button-row {

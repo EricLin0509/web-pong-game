@@ -895,6 +895,13 @@ void goto_menu(void)
 }
 
 EMSCRIPTEN_KEEPALIVE
+void toggle_theme(void)
+{
+    if (game_ptr && game_ptr->state == GAME_INIT)
+        set_theme(game_ptr);
+}
+
+EMSCRIPTEN_KEEPALIVE
 void toggle_game_mode(void)
 {
     if (game_ptr && game_ptr->state == GAME_INIT)

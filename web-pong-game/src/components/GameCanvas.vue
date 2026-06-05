@@ -25,12 +25,29 @@
           </div>
 
           <div class="button-bar" v-if="isWasmLoaded">
-            <button v-if="gameState === 0" @click="startGame" class="game-btn">▶ Start Game</button>
-            <button v-if="gameState === 0" @click="toggleGameMode" class="game-btn">🔄 Switch Mode</button>
-            <button v-if="gameState === 0" @click="togglePlayer" class="game-btn">👥 Switch Player</button>
-            <button v-if="gameState === 2" @click="resumeGame" class="game-btn">➡️ Resume Game</button>
-            <button v-if="gameState === 2 || gameState === 3" @click="gotoMenu" class="game-btn">↩️ Back to Menu</button>
-            <button v-if="gameState === 3" @click="restartGame" class="game-btn">🔄 Restart Game</button>
+
+            <div v-if="gameState === 0" class="button-group">
+              <div class="button-row big-row">
+                <button @click="startGame" class="game-btn game-btn-start">▶ Start Game</button>
+              </div>
+              <div class="button-row big-row">
+                <button @click="toggleGameMode" class="game-btn">🔄 Switch Mode</button>
+              </div>
+              <div class="button-row other-row">
+                <button @click="togglePlayer" class="game-btn">👥 Switch Player</button>
+                <button @click="toggleTheme" class="game-btn">🎨 Change Theme</button>
+              </div>
+            </div>
+
+            <div v-if="gameState === 2" class="button-row">
+              <button @click="resumeGame" class="game-btn">➡️ Resume Game</button>
+            </div>
+            <div v-if="gameState === 3" class="button-row">
+              <button @click="restartGame" class="game-btn">🔄 Restart Game</button>
+            </div>
+            <div v-if="gameState === 2 || gameState === 3" class="button-row">
+              <button @click="gotoMenu" class="game-btn">↩️ Back to Menu</button>
+            </div>
           </div>
         </div>
       <!-- Player 2 score -->
@@ -171,6 +188,12 @@ function restartGame() {
 function gotoMenu() {
   if (pongModule && pongModule._goto_menu) {
     pongModule._goto_menu()
+  }
+}
+
+function toggleTheme() {
+  if (pongModule && pongModule._toggle_theme) {
+    pongModule._toggle_theme()
   }
 }
 
@@ -509,7 +532,7 @@ canvas {
 
 .button-bar {
   position: absolute;
-  bottom: 20px;
+  bottom: 25px;
   left: 0;
   right: 0;
   display: flex;
@@ -517,6 +540,51 @@ canvas {
   gap: 15px;
   z-index: 20;
   pointer-events: auto;
+}
+
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.button-row {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.big-row {
+  width: 80%;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.big-row .game-btn {
+  width: 100%;
+  min-height: 50px;
+}
+
+.other-row {
+  width: auto;
+}
+.other-row .game-btn {
+  min-width: 130px;
+}
+
+.game-btn-start {
+  background: #ffaa66;
+  color: #0a0f1a;
+  border-color: #ffcc88;
+  box-shadow: 0 0 12px rgba(255, 170, 102, 0.8);
+}
+
+.game-btn-start:hover {
+  background: #ffcc88;
+  transform: scale(1.02);
+  box-shadow: 0 0 16px rgba(255, 170, 102, 1);
 }
 
 .game-btn {
@@ -531,6 +599,8 @@ canvas {
   cursor: pointer;
   transition: 0.2s;
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  min-width: 120px;
+  text-align: center;
 }
 
 .game-btn:hover {

@@ -86,7 +86,10 @@
   </div>
   <div ref="introRef" class="game-intro" :class="{ visible: introVisible }">
     <div class="intro-content">
-      <h2>🎮 About Pong</h2>
+      <h2>
+        <img src="/logo.png" alt="Pong logo" class="about-icon" />
+        About Pong
+      </h2>
       <p>
         Pong is a 1972 sports video game developed and published by Atari, Inc. for arcades. It was created by Allan Alcorn as a training exercise assigned to him by Atari co-founder Nolan Bushnell. Bushnell and Atari co-founder Ted Dabney were so surprised by the quality of Alcorn's work that they decided to manufacture the game. Bushnell based the game's concept on an electronic ping-pong game included on the Magnavox Odyssey, the first home video game console; in response, Magnavox later sued Atari for patent infringement.
       </p>
@@ -918,6 +921,12 @@ kbd {
 .history-panel:hover,
 .keyboard-hint:hover {
   background: var(--panel-bg-hover);
+}
+
+.about-icon {
+  width: 48px;
+  height: 48px;
+  margin-right: 8px;
 }
 
 /* Animation */

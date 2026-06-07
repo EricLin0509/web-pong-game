@@ -238,13 +238,13 @@ static void ai_control(Game *game, float dt)
             predicted_y = 2 * (WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - BALL_SIZE) - predicted_y;
     }
 
-    /* Add some mistakes for AI after every 30 frames */
-    static int frame_counter = 0;
-    static float mistake = 0;
-    frame_counter++;
-    if (frame_counter >= 30)
+    /* Add some mistakes for AI after every 0.5s to prevent paddle jittering */
+    static float mistake_timer = 0.0f;
+    static float mistake = 0.0f;
+    mistake_timer += dt;
+    if (mistake_timer >= 0.5f)
     {
-        frame_counter = 0;
+        mistake_timer = 0.0f;
         mistake = game->difficulty();
     }
 
@@ -256,7 +256,7 @@ static void ai_control(Game *game, float dt)
     float move = PADDLE_SPEED_PER_SEC * dt * paddle_move_scale[game->difficulty_index];
 
     // Move the paddle the diff is big enough to prevent paddle shaking
-    if (fabsf(diff) < 1.5f) return;
+    if (fabsf(diff) < 2.0f) return; // 2.0f is the deadzone of the paddle
     if (diff > 0)
         ai_paddle->paddle_rect.y += (diff > move ? move : diff);
     else

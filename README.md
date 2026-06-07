@@ -1,4 +1,4 @@
-# Web Pong Game
+# <img src="./web-pong-game/public/logo.png" height="64"/> Web Pong Game
 
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Built with Emscripten](https://img.shields.io/badge/Built%20with-Emscripten-9cf)](https://emscripten.org)
@@ -24,7 +24,7 @@ Featuring two‑player gameplay, visual effects, local score history, and authen
 - **Make** – build automation
 - **CLANG** – for native build
 - **Emscripten** (emsdk) – for WebAssembly build
-- **Node.js** (≥18) and **npm** – for Vue frontend (web build)
+- **Node.js** (≥26) and **npm** – for Vue frontend (web build)
 - **SDL3** & **SDL3_ttf** – the base game engine
 
 ## 🏗️ Build Instructions

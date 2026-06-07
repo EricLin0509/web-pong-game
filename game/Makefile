@@ -10,7 +10,7 @@ SRC=paddle.c ball.c snow.c text.c main.c
 all: release
 
 gen_font:
-	xxd -i roboto.ttf > roboto.h
+	python gen-font-stream.py > roboto.h
 
 wasm: gen_font
 	$(CC_WASM) $(CFLAGS) $(WASM_CFLAGS) -O3 \

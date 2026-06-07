@@ -1,12 +1,20 @@
 #include <stdio.h>
 
 #include "text.h"
+#include "roboto.h" // embedded font
 #include "ansi-color.h"
 
-bool create_text_texture(Text *text, const char *font_path, const char *str, int font_size,
-                                                                    SDL_Renderer *renderer, SDL_Color color)
+SDL_IOStream *load_font(void)
 {
-    TTF_Font *font = TTF_OpenFont(font_path, font_size);
+    return SDL_IOFromMem(roboto_ttf, roboto_ttf_len);
+}
+
+bool create_text_texture(Text *text, SDL_IOStream *stream, const char *str, int font_size,
+                                                            SDL_Renderer *renderer, SDL_Color color)
+{
+    if (stream == NULL) return false; // Check if the stream is valid
+
+    TTF_Font *font = TTF_OpenFontIO(stream, false, font_size);
     if (font == NULL)
     {
         fprintf(stderr, ERROR_TEXT " Failed to load font: %s\n", SDL_GetError());

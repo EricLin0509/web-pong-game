@@ -1,6 +1,9 @@
 # Pong modules
 pong*
 
+# Generated embedded fonts
+roboto.h
+
 # Logs
 logs
 *.log

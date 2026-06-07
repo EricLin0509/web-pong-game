@@ -731,30 +731,38 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 #endif
 
     /* Load font */
+    SDL_IOStream *font_stream = load_font();
+    if (font_stream == NULL)
+    {
+        fprintf(stderr, ERROR_TEXT " Failed to load font: %s\n", SDL_GetError());
+        return SDL_APP_FAILURE;
+    }
+
     bool font_loaded = true;
 
-    font_loaded &= create_text_texture(game.texts, FONT_PATH, "Welcome to Pong", FONT_SIZE, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts, font_stream, "Welcome to Pong", FONT_SIZE, game.window_renderer, FONT_COLOR);
 
 #ifdef __EMSCRIPTEN__
-    font_loaded &= create_text_texture(game.texts + 1, FONT_PATH, "Press SPACE or click start button", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 1, font_stream, "Press SPACE or click start button", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
 #else
-    font_loaded &= create_text_texture(game.texts + 1, FONT_PATH, "Press [SPACE] to start", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 1, font_stream, "Press [SPACE] to start", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
 #endif
-    font_loaded &= create_text_texture(game.texts + 2, FONT_PATH, "Classic Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(game.texts + 3, FONT_PATH, "Infinite Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 2, font_stream, "Classic Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 3, font_stream, "Infinite Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
 
-    font_loaded &= create_text_texture(game.texts + 4, FONT_PATH, "Single Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(game.texts + 5, FONT_PATH, "Double Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 4, font_stream, "Single Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 5, font_stream, "Double Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
 
-    font_loaded &= create_text_texture(game.texts + 6, FONT_PATH, "Simple", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(game.texts + 7, FONT_PATH, "Medium", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(game.texts + 8, FONT_PATH, "Hard", FONT_SIZE - 16, game.window_renderer, FONT_COLOR); 
+    font_loaded &= create_text_texture(game.texts + 6, font_stream, "Simple", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 7, font_stream, "Medium", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 8, font_stream, "Hard", FONT_SIZE - 16, game.window_renderer, FONT_COLOR); 
 
-    font_loaded &= create_text_texture(game.texts + 9, FONT_PATH, "Paused", FONT_SIZE, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 9, font_stream, "Paused", FONT_SIZE, game.window_renderer, FONT_COLOR);
 
-    font_loaded &= create_text_texture(game.texts + 10, FONT_PATH, "WIN", FONT_SIZE, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(game.texts + 11, FONT_PATH, "Press [space] to restart", FONT_SIZE - 36, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 10, font_stream, "WIN", FONT_SIZE, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 11, font_stream, "Press [space] to restart", FONT_SIZE - 36, game.window_renderer, FONT_COLOR);
 
+    SDL_CloseIO(font_stream);
     if (!font_loaded)
         return SDL_APP_FAILURE;
 

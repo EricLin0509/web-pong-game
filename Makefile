@@ -1,5 +1,5 @@
 GAMEDIR=game
-MODULES=pong.wasm pong.js pong.data
+MODULES=pong.wasm pong.js
 VUE_DIR=web-pong-game
 VUE_WASM_DIR=$(VUE_DIR)/public/wasm
 
@@ -22,6 +22,12 @@ local:
 
 run_local:
 	make -C $(GAMEDIR) run
+
+install:
+	make -C $(GAMEDIR) install
+
+uninstall:
+	make -C $(GAMEDIR) uninstall
 
 clean:
 	make -C $(GAMEDIR) clean

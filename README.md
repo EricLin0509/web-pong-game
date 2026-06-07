@@ -63,6 +63,20 @@ The executable will be placed in the `game/` directory.
 make run_local
 ```
 
+#### Install it to system directories
+
+If you want to install the game to your system directories, you can use the following commands:
+
+```bash
+sudo make install
+```
+
+#### Uninstall from system directories
+
+```bash
+sudo make uninstall
+```
+
 Then enjoy 🎉!
 
 ## 🎮 How to Play

@@ -29,30 +29,31 @@
           </div>
 
           <div class="button-bar" v-if="isWasmLoaded">
+            <div v-if="gameState === 0" class="button-group">
 
-          <div v-if="gameState === 0" class="button-group">
-
-            <div class="button-row big-row">
-              <button @click="startGame" class="game-btn game-btn-start">▶ Start Game</button>
-            </div>
-
-            <div class="button-row big-row">
-              <button @click="showSettings = !showSettings" class="game-btn">
-                ⚙️ {{ showSettings ? 'Close Settings' : 'Settings' }}
-              </button>
-            </div>
-
-            <div v-if="showSettings" class="settings-panel">
-              <div class="settings-row">
-                <button @click="toggleGameMode" class="game-btn">🔄 Switch Mode</button>
-                <button @click="togglePlayer" class="game-btn">👥 Switch Player</button>
+              <div class="button-row big-row">
+                <button @click="startGame" class="game-btn game-btn-start">▶ Start Game</button>
               </div>
-              <div class="settings-row">
-                <button @click="toggleDifficulty" class="game-btn">🎯 Change Difficulty</button>
-                <button @click="toggleTheme" class="game-btn">🎨 Change Theme</button>
+
+              <div class="button-row big-row">
+                <button @click="showSettings ^= true" class="game-btn">
+                  ⚙️ {{ showSettings ? 'Close Settings' : 'Settings' }}
+                </button>
               </div>
+
+              <transition name="slide-up">
+                <div v-if="showSettings" class="settings-panel">
+                  <div class="settings-row">
+                    <button @click="toggleGameMode" class="game-btn">🔄 Switch Mode</button>
+                    <button @click="togglePlayer" class="game-btn">👥 Switch Player</button>
+                  </div>
+                  <div class="settings-row">
+                    <button @click="toggleDifficulty" class="game-btn">🎯 Change Difficulty</button>
+                    <button @click="toggleTheme" class="game-btn">🎨 Change Theme</button>
+                  </div>
+                </div>
+              </transition>
             </div>
-          </div>
 
             <div v-if="gameState === 2" class="button-row">
               <button @click="resumeGame" class="game-btn">➡️ Resume Game</button>
@@ -986,6 +987,21 @@ kbd {
 
 .score.show {
   opacity: 1;
+  transform: translateY(0);
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform 0.5s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(120%);
+}
+
+.slide-up-enter-to,
+.slide-up-leave-from {
   transform: translateY(0);
 }
 </style>

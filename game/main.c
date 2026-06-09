@@ -272,16 +272,34 @@ static void handle_touch(Game *game, SDL_TouchFingerEvent finger)
     if (game == NULL) return;
     if (game->state != GAME_RUNNING) return;
 
-    float x = finger.x * WINDOW_WIDTH;
-    float delta_y = finger.dy * WINDOW_HEIGHT;
+    /* Get the logical presentation rectangle */
+    SDL_FRect logical_rect;
+    SDL_GetRenderLogicalPresentationRect(game->window_renderer, &logical_rect);
+
+    /* Convert the physical coordinates to logical coordinates (1024x768) and clamp them to the window bounds. */
+    int window_w = 0;
+    int window_h = 0;
+    SDL_GetWindowSize(game->window, &window_w, &window_h);
+
+    float phys_x = finger.x * (float)window_w;
+    float phys_y = finger.y * (float)window_h;
+
+    float logic_x = (phys_x - logical_rect.x) * (WINDOW_WIDTH / (float)logical_rect.w);
+    float logic_y = (phys_y - logical_rect.y) * (WINDOW_HEIGHT / (float)logical_rect.h);
 
     Paddle *chosen_paddle = NULL;
     if (game->mode_flags & DOUBLE_PLAYER_MASK)
-        chosen_paddle = x < WINDOW_WIDTH / 2 ? &game->left_paddle : &game->right_paddle;
+        chosen_paddle = logic_x < WINDOW_WIDTH / 2 ? &game->left_paddle : &game->right_paddle;
     else
-        chosen_paddle = &game->left_paddle; // In single player mode, only the left paddle can be controlled
+        chosen_paddle = &game->left_paddle;
 
-    paddle_move_touch(chosen_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET, delta_y);
+    if (chosen_paddle == NULL) return;
+
+    float new_y = logic_y - chosen_paddle->paddle_rect.h / 2;
+    new_y = SDL_clamp(new_y, WINDOW_BORDER_OFFSET,
+                      WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - chosen_paddle->paddle_rect.h);
+    chosen_paddle->paddle_rect.y = new_y;
+    chosen_paddle->direction = PADDLE_STOP;
 }
 
 #ifndef __EMSCRIPTEN__

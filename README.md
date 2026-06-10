@@ -1,4 +1,4 @@
-# <img src="./web-pong-game/public/logo.png" height="64"/> Web Pong Game
+# <img src="./web-pong-game/public/logo.ico" height="64"/> Web Pong Game
 
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Built with Emscripten](https://img.shields.io/badge/Built%20with-Emscripten-9cf)](https://emscripten.org)
@@ -45,7 +45,7 @@ This compiles the C source to WebAssembly and copies the generated files into th
 make run_server
 ```
 
-Then open your browser at http://localhost:5173 (The port may vary depending on your configuration).
+Then open your browser at `http://localhost:5173/web-pong-game/` (The port may vary depending on your configuration).
 
 ### Local Build (Native SDL3 Application)
 

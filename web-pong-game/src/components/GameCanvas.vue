@@ -87,7 +87,7 @@
   <div ref="introRef" class="game-intro" :class="{ visible: introVisible }">
     <div class="intro-content">
       <h2>
-        <img src="/logo.png" alt="Pong logo" class="about-icon" />
+        <img src="/logo.ico" alt="Pong logo" class="about-icon" />
         About Pong
       </h2>
       <p>
@@ -97,7 +97,7 @@
     </div>
   </div>
 
-  <div :class="['keyboard-hint', { 'animate-slide-right': isWasmLoaded}]" v-if="isWasmLoaded">
+  <div :class="['control-hint', 'keyboard-hint', { 'animate-slide-right': isWasmLoaded}]" v-if="isWasmLoaded">
     <h3>⌨️ Keyboard Controls</h3>
     <ul>
       <li><kbd>W</kbd> / <kbd>S</kbd> : Left paddle</li>
@@ -110,7 +110,17 @@
     </ul>
   </div>
 
-  <div :class="['history-panel', { 'animate-slide-right': isWasmLoaded }]" v-if="historyRecords.length">
+  <div v-if="isTouchDevice && isWasmLoaded" :class="['control-hint', 'touch-hint', { 'animate-slide-right': isWasmLoaded }]">
+    <h3>📱 Touch Controls</h3>
+    <ul>
+      <li>👈 Swipe on left side : Left paddle</li>
+      <li>👉 Swipe on right side : Right paddle</li>
+    </ul>
+  </div>
+
+  <div :class="['history-panel', { 'animate-slide-right': isWasmLoaded }]"
+     :style="{ top: isTouchDevice ? '180px' : '100px' }"
+     v-if="historyRecords.length">
     <h3>🏆 Recent scores (Classic)</h3>
     <ul>
       <li v-for="(record, idx) in historyRecords" :key="idx">
@@ -127,6 +137,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { loadWasm } from '../composables/useWasm.js'
 
 const showSettings = ref(false)
+const isTouchDevice = ref(false)
 
 // History records
 const historyRecords = ref([])
@@ -357,6 +368,8 @@ onMounted(async () => {
     )
     observer.observe(introRef.value)
   }
+
+  isTouchDevice.value = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0)
 
   // Load history records
   loadHistory()
@@ -737,9 +750,8 @@ canvas {
   text-decoration: none;
 }
 
-.keyboard-hint {
+.control-hint {
   position: fixed;
-  top: 20px;
   left: 20px;
   backdrop-filter: blur(10px);
   border-radius: 4px;
@@ -758,7 +770,23 @@ canvas {
   justify-content: center;
 }
 
-.keyboard-hint:hover {
+.keyboard-hint {
+  top: 20px;
+}
+
+.keyboard-hint::before {
+  content: "⌨️";
+}
+
+.touch-hint {
+  top: 100px;
+}
+
+.touch-hint::before {
+  content: "📱";
+}
+
+.control-hint:hover {
   width: 320px;
   height: auto;
   border-radius: 12px;
@@ -767,31 +795,30 @@ canvas {
   display: block;
 }
 
-.keyboard-hint h3 {
+.control-hint h3 {
   color: #5a9eff;
 }
 
-.keyboard-hint h3,
-.keyboard-hint ul {
+.control-hint h3,
+.control-hint ul {
   display: none;
 }
 
-.keyboard-hint:hover h3,
-.keyboard-hint:hover ul {
+.control-hint:hover h3,
+.control-hint:hover ul {
   display: block;
 }
 
-.keyboard-hint::before {
-  content: "⌨️";
+.control-hint::before {
   font-size: 28px;
   line-height: 1;
 }
 
-.keyboard-hint:hover::before {
+.control-hint:hover::before {
   display: none;
 }
 
-.keyboard-hint ul {
+.control-hint ul {
   padding-left: 20px;
   margin: 8px 0;
 }
@@ -803,7 +830,6 @@ canvas {
 
 .history-panel {
   position: fixed;
-  top: 100px;
   left: 20px;
   backdrop-filter: blur(10px);
   border-radius: 4px;
@@ -884,13 +910,13 @@ canvas {
 }
 
 .history-panel:hover,
-.keyboard-hint:hover {
+.control-hint:hover {
   z-index: 10000;
 }
 
-.keyboard-hint h3,
+.control-hint h3,
 .history-panel h3,
-.keyboard-hint li,
+.control-hint li,
 .history-panel li {
   font-size: 14px;
   flex-shrink: 0;
@@ -912,14 +938,14 @@ kbd {
 
 .control-bar,
 .history-panel,
-.keyboard-hint,
+.control-hint,
 .focus-overlay {
   background: var(--panel-bg);
 }
 
 .control-bar:hover,
 .history-panel:hover,
-.keyboard-hint:hover {
+.control-hint:hover {
   background: var(--panel-bg-hover);
 }
 

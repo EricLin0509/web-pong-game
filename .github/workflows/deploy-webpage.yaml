@@ -1,0 +1,66 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup Emscripten
+        uses: emscripten-core/setup-emsdk@v16
+        with:
+          version: 5.0.7
+          emsdk-version: 5.0.7
+
+          actions-cache-folder: 'emsdk-cache'
+
+      - name: Verify Emscripten
+        run: emcc --version
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 'latest'
+
+      - name: Verify Node.js
+        run: |
+          node --version
+          npm --version
+
+      - name: Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y binutils python-is-python3
+
+      - name: Build WebAssembly module
+        run: |
+          make
+
+      - name: Build Vue app
+        run: |
+          cd web-pong-game
+          npm install
+          npm run build
+
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: web-pong-game/dist
+          branch: gh-pages
+          clean: true
+
+
+    
+
+
+
+

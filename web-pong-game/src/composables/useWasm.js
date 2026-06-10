@@ -19,16 +19,14 @@ export function loadWasm(canvas) {
         canvas.height = h;
       },
       locateFile: (path) => {
-        if (path.endsWith('.wasm')) return '/wasm/pong.wasm';
-        if (path.endsWith('.data')) return '/wasm/pong.data';
-        return '/wasm/' + path; // Load all other files from the same directory
+        return `./wasm/${path}`;
       },
       print: (text) => console.log('[C]', text),
       printErr: (text) => console.error('[C]', text),
     };
 
     const script = document.createElement('script');
-    script.src = '/wasm/pong.js'; // Load the script
+    script.src = './wasm/pong.js';
     script.onerror = () => reject(new Error('❌ Failed to load pong.js'));
     document.body.appendChild(script);
   });

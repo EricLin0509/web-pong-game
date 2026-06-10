@@ -706,13 +706,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     };
 
     /* Initialize window and renderer */
-    /* Emscripten no need to set logical presentation */
 #ifdef __EMSCRIPTEN__
     SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas"); // Limit the keyboard focus to the canvas only
-    game.window = SDL_CreateWindow(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
-#else
-    game.window = SDL_CreateWindow(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
 #endif
+    game.window = SDL_CreateWindow(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
 
     if (game.window == NULL)
     {
@@ -740,13 +737,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
-#ifndef __EMSCRIPTEN__
     if (!SDL_SetRenderLogicalPresentation(game.window_renderer, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX))
     {
         fprintf(stderr, ERROR_TEXT " Failed to set logical presentation: %s\n", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-#endif
 
     /* Load font */
     SDL_IOStream *font_stream = load_font();

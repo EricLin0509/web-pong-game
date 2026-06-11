@@ -20,10 +20,15 @@
   </div>
     <div class="screen-container">
       <!-- Player 1 score -->
-      <div :class="['score score-left', { show: gameState === 1 || gameState === 2, flash: flashLeft }]">{{ leftScore }}</div>
+      <div :class="['score score-left desktop-score', { show: gameState === 1 || gameState === 2, flash: flashLeft }]">{{ leftScore }}</div>
       <!-- The canvas frame -->
         <div :class="['frame', { 'animate-slide-down': isWasmLoaded }]" ref="frameRef">
-          <canvas ref="canvasRef" id="canvas" tabindex="0" @click="canvasRef?.focus()"></canvas>
+          <canvas ref="canvasRef" id="canvas" tabindex="0" @click="canvasRef?.focus()" @touchmove.prevent></canvas>
+          <div class="canvas-score" v-if="gameState === 1 || gameState === 2">
+            <span :class="['canvas-score-left', { flash: flashLeft }]">{{ leftScore }}</span>
+            <span class="canvas-score-sep"> </span>
+            <span :class="['canvas-score-right', { flash: flashRight }]">{{ rightScore }}</span>
+          </div>
           <div v-if="!isCanvasFocused && (gameState === 1 || gameState === 2)" class="focus-overlay">
             ⚠️ Canvas is not focused! ⚠️
           </div>
@@ -67,7 +72,7 @@
           </div>
         </div>
       <!-- Player 2 score -->
-      <div :class="['score score-right', { show: gameState === 1 || gameState === 2, flash: flashRight }]">{{ rightScore }}</div>
+      <div :class="['score score-right desktop-score', { show: gameState === 1 || gameState === 2, flash: flashRight }]">{{ rightScore }}</div>
     </div>
 
     <div :class="['control-bar', { 'animate-slide-up': isWasmLoaded }]">
@@ -528,6 +533,44 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 
+@media (max-width: 650px) or (max-height: 600px) {
+  .focus-overlay {
+    font-size: 12px;
+    padding: 10px 16px;
+  }
+
+  .game-info {
+    gap: 10px;
+    padding: 4px 8px;
+    font-size: 0.9rem;
+  }
+
+  .info-item {
+    gap: 6px;
+  }
+
+  .info-icon {
+    font-size: 1rem
+  }
+
+  .theme-badge {
+    border-radius: 10px;
+    padding: 2px 4px;
+    margin-left: 2px;
+    font-size: 0.9rem;
+  }
+
+  .control-bar {
+    gap: 8px;
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+
+  .count-value {
+    min-width: 40px;
+  }
+}
+
 .snow-slider {
   width: 300px;
   cursor: pointer;
@@ -547,6 +590,17 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   background: #ffaa66;
   cursor: pointer;
+}
+
+@media (max-width: 650px) or (max-height: 600px) {
+  .snow-slider {
+    width: 210px;
+  }
+
+  .snow-slider::-webkit-slider-thumb {
+    width: 12px;
+    height: 12px;
+  }
 }
 
 .screen-container {
@@ -570,6 +624,57 @@ onBeforeUnmount(() => {
   min-width: 80px;
   text-align: center;
   user-select: none;
+}
+
+.canvas-score {
+  position: absolute;
+  top: 16px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+  font-size: 4vw;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 0 10px rgba(255,255,255,0.5);
+  padding: 8px 16px;
+  border-radius: 40px;
+  width: fit-content;
+  margin: 0 auto;
+  z-index: 5;
+  pointer-events: none;
+  white-space: nowrap;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.canvas-score-left,
+.canvas-score-right {
+  min-width: 40px;
+  text-align: center;
+}
+
+.canvas-score-sep {
+  font-size: 2vw;
+}
+
+.canvas-score {
+  display: none;
+}
+
+/* 原有的左右分数（在小屏时隐藏） */
+@media (max-width: 650px) or (max-height: 600px) {
+  .desktop-score {
+    display: none;
+  }
+  .canvas-score {
+    display: flex;
+  }
+
+  .focus-overlay {
+    top: 80px;
+  }
 }
 
 .frame {
@@ -662,11 +767,22 @@ canvas {
   min-height: 50px;
 }
 
-.other-row {
-  width: auto;
-}
-.other-row .game-btn {
-  min-width: 130px;
+@media (max-width: 650px) or (max-height: 600px) {
+
+  .button-group,
+  .settings-panel {
+    gap: 8px;
+  }
+
+  .settings-row {
+    gap: 10px;
+  }
+
+  .big-row .game-btn,
+  .settings-row .game-btn {
+    min-height: 8px;
+    font-size: 12px;
+  }
 }
 
 .game-btn-start {
@@ -688,13 +804,13 @@ canvas {
   border: 1px solid rgba(255, 255, 255, 0.3);
   color: white;
   font-family: monospace;
-  font-size: clamp(10px, 2vw, 14px);
+  font-size: clamp(12px, 1vw, 14px);
   padding: clamp(6px, 2vw, 12px) clamp(12px, 4vw, 28px);
   border-radius: 40px;
   cursor: pointer;
   transition: 0.2s;
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-  min-width: 120px;
+  min-width: clamp(60px, 10vw, 120px);
   text-align: center;
 }
 
@@ -764,7 +880,6 @@ canvas {
   overflow: hidden;
   cursor: pointer;
   z-index: 100;
-  border-left: 4px solid #5a9eff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -772,31 +887,44 @@ canvas {
 
 .keyboard-hint {
   top: 20px;
+  border-left: 4px solid #5a9eff;
 }
 
 .keyboard-hint::before {
   content: "⌨️";
 }
 
+.keyboard-hint:hover {
+  border-left: 12px solid #5a9eff;
+}
+
+.keyboard-hint h3 {
+  color: #5a9eff;
+}
+
 .touch-hint {
   top: 100px;
+  border-left: 4px solid #67acce;
 }
 
 .touch-hint::before {
   content: "📱";
 }
 
+.touch-hint:hover {
+  border-left: 12px solid #67acce;
+}
+
+.touch-hint h3 {
+  color: #67acce;
+}
+
 .control-hint:hover {
   width: 320px;
   height: auto;
   border-radius: 12px;
-  border-left: 12px solid #5a9eff;
   padding: 12px 20px;
   display: block;
-}
-
-.control-hint h3 {
-  color: #5a9eff;
 }
 
 .control-hint h3,
@@ -995,6 +1123,8 @@ kbd {
   100% { text-shadow: 0 0 10px rgba(255,255,255,0.5); opacity: 1; transform: scale(1); }
 }
 
+.canvas-score-left.flash,
+.canvas-score-right.flash,
 .score.flash {
   animation: scoreFlash 0.3s ease-out;
 }

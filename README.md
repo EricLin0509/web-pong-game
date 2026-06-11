@@ -6,26 +6,30 @@
 A classic Pong game that runs both natively (SDL3) and in the browser (WebAssembly + Vue 3).  
 Featuring two‑player gameplay, visual effects, local score history, and authentic arcade physics.
 
+### 🌐 Website: https://ericlin0509.github.io/web-pong-game/
+
 ## ✨ Features
 
-- Two‑player local play (W/S vs I/K)
+- Single‑player mode (AI opponent)
+- Two‑player local play (`W`/`S` vs `I`/`K`)
 - Classic mode (first to 11) & Infinite mode
 - Adjustable snowflake particles
 - Random color themes (press `C`)
 - Hit‑angle based ball bounce (original Pong behaviour)
-- Score history stored in browser (implemented by `localStorage`, **Classic mode only**)
-- **Touch support** – slide on left/right half to move paddles, double‑tap anywhere to (re)start the game
-    - **Note:** double‑tap only supports native build
+- Score history stored in browser (implemented using `localStorage`, **Classic mode only**)
+- **Touch support (Partial)** – slide on left/right half to move paddles, double‑tap anywhere to (re)start the game
+    - **Note:** double‑tap only supports native and android build
 - **Idle energy saving** – reduces GPU usage when game is paused or in menus (Web & native)
 - Responsive layout with on‑screen controls (**Vue app only**)
 
 ## 🔧 Dependencies
 
+- **SDL3** & **SDL3_ttf** – the base game engine
 - **Make** – build automation
 - **CLANG** – for native build
 - **Emscripten** (emsdk) – for WebAssembly build
-- **Node.js** (≥26) and **npm** – for Vue frontend (web build)
-- **SDL3** & **SDL3_ttf** – the base game engine
+- **Node.js** (≥26) & **npm** – for Vue frontend (web build)
+- **Android SDK** & **NDK** – for Android build
 
 ## 🏗️ Build Instructions
 
@@ -63,6 +67,8 @@ The executable will be placed in the `game/` directory.
 make run_local
 ```
 
+Then enjoy 🎉!
+
 #### Install it to system directories
 
 If you want to install the game to your system directories, you can use the following commands:
@@ -77,7 +83,35 @@ sudo make install
 sudo make uninstall
 ```
 
-Then enjoy 🎉!
+### Build for Android
+
+This game also has **limited** support for Android. To build for Android, you need to install the Android SDK and NDK from [Android Studio](https://developer.android.com/studio)
+
+#### 1. Initialize android support submodule
+
+Due to the Android support being out-of-tree, you need to initialize the submodule first:
+
+```bash
+git submodule update --init --recursive
+```
+
+#### 2. Build the Android APK
+
+For Debug Build:
+
+```bash
+cd android
+./gradlew assembleDebug
+```
+
+For Release Build:
+
+```bash
+cd android
+./gradlew assembleRelease
+```
+
+The APK will be placed in the `android/app/build/outputs/apk/debug/` or `android/app/build/outputs/apk/release/` directory respectively.
 
 ## 🎮 How to Play
 

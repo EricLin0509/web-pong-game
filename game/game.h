@@ -35,6 +35,36 @@ typedef struct {
 
 #endif
 
+#define CORE_TEXTS \
+    TEXT(0, "Welcome to Pong", 64) \
+    TEXT(2, "Classic Mode", 48) \
+    TEXT(3, "Infinite Mode", 48) \
+    TEXT(4, "Single Player", 48) \
+    TEXT(5, "Double Player", 48) \
+    TEXT(6, "Easy", 48) \
+    TEXT(7, "Medium", 48) \
+    TEXT(8, "Hard", 48) \
+    TEXT(9, "Paused", 64) \
+    TEXT(10, "WIN", 72)
+
+#ifdef __EMSCRIPTEN__
+
+#define INFO_TEXTS \
+    TEXT(1, "Press Start Button to start", 32) \
+    TEXT(11, "Press Restart Button to restart", 28)
+
+#else
+
+#define INFO_TEXTS \
+    TEXT(1, "Press [SPACE] to start", 32) \
+    TEXT(11, "Press [SPACE] to restart", 28)
+
+#endif
+
+#define LIST_OF_TEXTS \
+    CORE_TEXTS \
+    INFO_TEXTS
+
 typedef struct {
     SDL_Window *window;
     SDL_FRect window_boarder;
@@ -48,22 +78,7 @@ typedef struct {
 
     Snow snow;
 
-    Text texts[TOTAL_TEXT];
-    /*
-        The text array contains the following texts:
-        [0]: Welcome to Pong
-        [1]: Press [SPACE] to start
-        [2]: Classic Mode
-        [3]: Infinite Mode
-        [4]: Single Player
-        [5]: Double Player
-        [6]: Simple
-        [7]: Medium
-        [8]: Hard
-        [9]: Paused
-        [10]: WIN
-        [11]: Press [space] to restart
-    */
+    Text texts[TOTAL_TEXT]; // This include all the texts in LIST_OF_TEXTS
 
     Uint8 mode_flags; // Flags for the game mode
 

@@ -498,13 +498,13 @@ static void show_game_over_screen(Game *game)
     float desc_pos_x = 0;
     if (game->left_score > game->right_score)
     {
-        msg_pos_x = (WINDOW_WIDTH - game->texts[10].text_rect.w) / 5;
-        desc_pos_x = (WINDOW_WIDTH - game->texts[11].text_rect.w) / 8;
+        msg_pos_x = (WINDOW_WIDTH - WINDOW_BORDER_OFFSET * 2) / 4 - (game->texts[10].text_rect.w / 2);
+        desc_pos_x = (WINDOW_WIDTH - WINDOW_BORDER_OFFSET * 2) / 4 - (game->texts[11].text_rect.w / 2);
     }
     else
     {
-        msg_pos_x = (WINDOW_WIDTH - game->texts[10].text_rect.w) * 4 / 5;
-        desc_pos_x = (WINDOW_WIDTH - game->texts[11].text_rect.w) * 7 / 8;
+        msg_pos_x = (WINDOW_WIDTH - WINDOW_BORDER_OFFSET * 2) * 3 / 4 - (game->texts[10].text_rect.w / 2);
+        desc_pos_x = (WINDOW_WIDTH - WINDOW_BORDER_OFFSET * 2) * 3 / 4 - (game->texts[11].text_rect.w / 2);
     }
 
     render_text_texture(&game->texts[10], game->window_renderer,
@@ -714,27 +714,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     bool font_loaded = true;
 
-    font_loaded &= create_text_texture(game.texts, font_stream, "Welcome to Pong", FONT_SIZE, game.window_renderer, FONT_COLOR);
-
-#ifdef __EMSCRIPTEN__
-    font_loaded &= create_text_texture(game.texts + 1, font_stream, "Press SPACE or click start button", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
-#else
-    font_loaded &= create_text_texture(game.texts + 1, font_stream, "Press [SPACE] to start", FONT_SIZE - 32, game.window_renderer, FONT_COLOR);
-#endif
-    font_loaded &= create_text_texture(game.texts + 2, font_stream, "Classic Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(game.texts + 3, font_stream, "Infinite Mode", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
-
-    font_loaded &= create_text_texture(game.texts + 4, font_stream, "Single Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(game.texts + 5, font_stream, "Double Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
-
-    font_loaded &= create_text_texture(game.texts + 6, font_stream, "Easy", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(game.texts + 7, font_stream, "Medium", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(game.texts + 8, font_stream, "Hard", FONT_SIZE - 16, game.window_renderer, FONT_COLOR); 
-
-    font_loaded &= create_text_texture(game.texts + 9, font_stream, "Paused", FONT_SIZE, game.window_renderer, FONT_COLOR);
-
-    font_loaded &= create_text_texture(game.texts + 10, font_stream, "WIN", FONT_SIZE, game.window_renderer, FONT_COLOR);
-    font_loaded &= create_text_texture(game.texts + 11, font_stream, "Press [space] to restart", FONT_SIZE - 36, game.window_renderer, FONT_COLOR);
+#define TEXT(index, str, font_size) \
+    font_loaded &= create_text_texture(game.texts + index, font_stream, str, font_size, game.window_renderer, FONT_COLOR);
+LIST_OF_TEXTS
+#undef TEXT
 
     SDL_CloseIO(font_stream);
     if (!font_loaded)

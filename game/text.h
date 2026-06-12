@@ -4,7 +4,6 @@
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
-#define FONT_SIZE 64
 #define FONT_COLOR (SDL_Color){255, 255, 255, 255}
 
 typedef struct {

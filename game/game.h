@@ -6,6 +6,7 @@
 
 #include <SDL3/SDL.h>
 
+#include "difficulty.h"
 #include "text.h"
 #include "ball.h"
 #include "snow.h"
@@ -33,8 +34,6 @@ typedef struct {
 } LastTap; // Add Double Tap gesture support
 
 #endif
-
-typedef float (*ai_difficulty_func)(void);
 
 typedef struct {
     SDL_Window *window;
@@ -76,8 +75,7 @@ typedef struct {
     GameState state;
     Uint8 theme_index; // Index of the current theme
     Theme const *theme;
-    Uint8 difficulty_index;
-    ai_difficulty_func difficulty;
+    Difficulty difficulty_index;
 
 #ifndef __EMSCRIPTEN__
     LastTap last_tap;

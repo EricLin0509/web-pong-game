@@ -4,38 +4,26 @@
 
 #define MAX_BOUNCE_ANGLE 300.0f
 
-float initial_speed_easy(void)
-{
-    return (float)rand() / (float)RAND_MAX * 50.0f + 350.0f; // [350, 400]
-}
-
-float initial_speed_medium(void)
-{
-    return (float)rand() / (float)RAND_MAX * 100.0f + 400.0f; // [400, 500]
-}
-
-float initial_speed_hard(void)
-{
-    return (float)rand() / (float)RAND_MAX * 150.0f + 500.0f; // [500, 650]
-}
-
-static const initial_speed_generator generators[3] = {
-    initial_speed_easy,
-    initial_speed_medium,
-    initial_speed_hard
-};
-
-void ball_init(Ball *ball, float x, float y, int width, int height)
+void ball_init(Ball *ball, float x, float y, int width, int height, initial_speed_generator generator)
 {
     if (ball == NULL) return;
+    if (generator == NULL) return;
 
     ball->rect.x = ball->orig_x = x;
     ball->rect.y = ball->orig_y = y;
     ball->rect.w = width;
     ball->rect.h = height;
 
-    ball->generator = generators[0];
-    
+    set_ball_difficulty(ball, generator);
+}
+
+void set_ball_difficulty(Ball *ball, initial_speed_generator generator)
+{
+    if (ball == NULL) return;
+    if (generator == NULL) return;
+
+    ball->generator = generator;
+
     ball->speed_x = (SHOUD_MOVE_REVERSE) ? -(ball->generator()) : (ball->generator());
     ball->speed_y = (SHOUD_MOVE_REVERSE) ? -(ball->generator()) + 200.0f : (ball->generator()) - 200.0f;
 }
@@ -47,18 +35,6 @@ void reset_ball(Ball *ball, bool left_serve)
     ball->rect.x = ball->orig_x;
     ball->rect.y = ball->orig_y;
     ball->speed_x = (left_serve) ? -(ball->generator()) : (ball->generator());
-    ball->speed_y = (SHOUD_MOVE_REVERSE) ? -(ball->generator()) + 200.0f : (ball->generator()) - 200.0f;
-}
-
-void set_ball_difficulty(Ball *ball, Uint8 index)
-{
-    if (ball == NULL) return;
-
-    if (index < 3)
-        ball->generator = generators[index];
-
-    /* Update ball speed based on difficulty */
-    ball->speed_x = (SHOUD_MOVE_REVERSE) ? -(ball->generator()) : (ball->generator());
     ball->speed_y = (SHOUD_MOVE_REVERSE) ? -(ball->generator()) + 200.0f : (ball->generator()) - 200.0f;
 }
 

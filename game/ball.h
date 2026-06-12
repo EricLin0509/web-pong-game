@@ -28,11 +28,11 @@ typedef struct {
     float speed_y;
 } Ball;
 
-void ball_init(Ball *ball, float x, float y, int width, int height);
+void ball_init(Ball *ball, float x, float y, int width, int height, initial_speed_generator generator);
+
+void set_ball_difficulty(Ball *ball, initial_speed_generator generator);
 
 void reset_ball(Ball *ball, bool left_serve);
-
-void set_ball_difficulty(Ball *ball, Uint8 index);
 
 /* @note: No need to minus the ball size in the collision check, It already included */
 CollisionType ball_collision(Ball *ball, Paddle *left_paddle, Paddle *right_paddle,

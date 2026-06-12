@@ -18,7 +18,6 @@
 #define WINDOW_BORDER_OFFSET 10
 #define WINDOW_TITLE "Pong"
 #define LINE_WIDTH 2
-#define NUM_DIFFICULTY 3
 
 #define CLASSIC_WIN_SCORE 11
 #define INFINITE_WIN_SCORE SIZE_MAX // Use SIZE_MAX to represent infinity
@@ -41,43 +40,6 @@ void notify_game_state(void);
 void store_score_history(void);
 #endif
 #endif
-
-/* ===== AI Difficulty Functions ====== */
-
-static inline float easy_ai_difficulty(void)
-{
-    return (float)rand() / (float)RAND_MAX * 160.0f - 80.0f; // [-80, 80]
-}
-
-static inline float medium_ai_difficulty(void)
-{
-    return (float)rand() / (float)RAND_MAX * 80.0f - 40.0f; // [-40, 40]
-}
-
-static inline float hard_ai_difficulty(void)
-{
-    return (float)rand() / (float)RAND_MAX * 20.0f - 10.0f; // [-10, 10]
-}
-
-static const ai_difficulty_func selections[NUM_DIFFICULTY] = {
-    easy_ai_difficulty,
-    medium_ai_difficulty,
-    hard_ai_difficulty
-};
-
-static const float paddle_move_scale[NUM_DIFFICULTY] = {
-    0.8f,
-    1.0f,
-    1.2f
-};
-
-static void set_ai_difficulty(ai_difficulty_func *difficulty, Uint8 index)
-{
-    if (difficulty == NULL) return;
-
-    if (index < NUM_DIFFICULTY)
-        *difficulty = selections[index]; // Set the difficulty function
-}
 
 /* ===== Theme Functions ====== */
 
@@ -153,9 +115,8 @@ static void switch_difficulty(Game *game)
     if (game == NULL) return;
     if (game->state != GAME_INIT) return; // The game mode can only be switched when the game is in the init state
 
-    game->difficulty_index = (game->difficulty_index + 1) % NUM_DIFFICULTY;
-    set_ai_difficulty(&game->difficulty, game->difficulty_index);
-    set_ball_difficulty(&game->ball, game->difficulty_index);
+    game->difficulty_index = (game->difficulty_index + 1) % NUM_DIFFICULTIES;
+    set_ball_difficulty(&game->ball, ball_speed_generators[game->difficulty_index]);
 
 #ifndef BENCHMARK_MODE
     game->last_key_ticks = SDL_GetTicks(); // Refresh the UI
@@ -245,7 +206,7 @@ static void ai_control(Game *game, float dt)
     if (mistake_timer >= 0.5f)
     {
         mistake_timer = 0.0f;
-        mistake = game->difficulty();
+        mistake = (ai_difficulties[game->difficulty_index])();
     }
 
     float target_y = predicted_y - ai_paddle->paddle_rect.h / 2 + mistake;
@@ -253,7 +214,7 @@ static void ai_control(Game *game, float dt)
                          WINDOW_HEIGHT - WINDOW_BORDER_OFFSET - ai_paddle->paddle_rect.h);
 
     float diff = target_y - ai_paddle->paddle_rect.y;
-    float move = PADDLE_SPEED_PER_SEC * dt * paddle_move_scale[game->difficulty_index];
+    float move = PADDLE_SPEED_PER_SEC * dt * paddle_move_scales[game->difficulty_index];
 
     // Move the paddle the diff is big enough to prevent paddle shaking
     if (fabsf(diff) < 2.0f) return; // 2.0f is the deadzone of the paddle
@@ -483,13 +444,13 @@ static void show_game_mode_screen(Game *game)
     Text *difficulty_text = NULL;
     switch (game->difficulty_index)
     {
-        case 0:
+        case DIFFICULTY_EASY:
             difficulty_text = game->texts + 6;
             break;
-        case 1:
+        case DIFFICULTY_MEDIUM:
             difficulty_text = game->texts + 7;
             break;
-        case 2:
+        case DIFFICULTY_HARD:
             difficulty_text = game->texts + 8;
             break;
         default:
@@ -766,7 +727,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     font_loaded &= create_text_texture(game.texts + 4, font_stream, "Single Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
     font_loaded &= create_text_texture(game.texts + 5, font_stream, "Double Player", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
 
-    font_loaded &= create_text_texture(game.texts + 6, font_stream, "Simple", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
+    font_loaded &= create_text_texture(game.texts + 6, font_stream, "Easy", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
     font_loaded &= create_text_texture(game.texts + 7, font_stream, "Medium", FONT_SIZE - 16, game.window_renderer, FONT_COLOR);
     font_loaded &= create_text_texture(game.texts + 8, font_stream, "Hard", FONT_SIZE - 16, game.window_renderer, FONT_COLOR); 
 
@@ -779,20 +740,19 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     if (!font_loaded)
         return SDL_APP_FAILURE;
 
+    /* Initialize difficulty */
+    game.difficulty_index = DIFFICULTY_EASY;
+
     /* Initialize paddles */
     paddle_init(&game.left_paddle, PADDLE_PADDING, (WINDOW_HEIGHT - PADDLE_HEIGHT) / 2, PADDLE_WIDTH, PADDLE_HEIGHT);
     paddle_init(&game.right_paddle, WINDOW_WIDTH - PADDLE_WIDTH - PADDLE_PADDING, (WINDOW_HEIGHT - PADDLE_HEIGHT) / 2, PADDLE_WIDTH, PADDLE_HEIGHT);
 
     /* Initialize ball */
-    ball_init(&game.ball, (WINDOW_WIDTH - BALL_SIZE) / 2, (WINDOW_HEIGHT - BALL_SIZE) / 2, BALL_SIZE, BALL_SIZE);
+    ball_init(&game.ball, (WINDOW_WIDTH - BALL_SIZE) / 2, (WINDOW_HEIGHT - BALL_SIZE) / 2, BALL_SIZE, BALL_SIZE, ball_speed_generators[game.difficulty_index]);
 
     /* Initialize snow sprite */
     if (!init_snow(&game.snow, game.window_renderer))
         return SDL_APP_FAILURE;
-
-    /* Initialize AI difficulty */
-    game.difficulty = selections[0];
-    game.difficulty_index = 0;
 
     /* Initialize theme */
     set_theme(&game);
@@ -861,11 +821,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         return SDL_APP_CONTINUE;
 
     paddle_move(&game->left_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET,
-                PADDLE_SPEED_PER_SEC * paddle_move_scale[game->difficulty_index], dt);
+                PADDLE_SPEED_PER_SEC * paddle_move_scales[game->difficulty_index], dt);
     
     if (game->mode_flags & DOUBLE_PLAYER_MASK)
         paddle_move(&game->right_paddle, WINDOW_BORDER_OFFSET, WINDOW_HEIGHT - WINDOW_BORDER_OFFSET,
-                PADDLE_SPEED_PER_SEC * paddle_move_scale[game->difficulty_index], dt);
+                PADDLE_SPEED_PER_SEC * paddle_move_scales[game->difficulty_index], dt);
     else
         ai_control(game, dt);
         

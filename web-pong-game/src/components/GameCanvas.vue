@@ -166,7 +166,7 @@ let observer = null
 // Game mode and theme number
 const gameMode = ref('Classic')
 const Players = ref('Single')
-const difficulty = ref('Simple')
+const difficulty = ref('Easy')
 const themeNumber = ref(1)
 
 // Snowflake count
@@ -201,7 +201,7 @@ window.onModeThemeChange = (game_mode, player, DifficultyIdx, themeIdx) => {
   Players.value = player === 0 ? 'Single' : 'Double'
   switch (DifficultyIdx) {
     case 0:
-      difficulty.value = 'Simple'
+      difficulty.value = 'Easy'
       break
     case 1:
       difficulty.value = 'Medium'
@@ -506,7 +506,7 @@ onBeforeUnmount(() => {
   color: #ffb86c;
 }
 
-.difficulty-simple {
+.difficulty-easy {
   color: #4caf50;
 }
 .difficulty-medium {
@@ -1014,6 +1014,13 @@ canvas {
 
 .history-panel:hover::before {
   display: none;
+}
+
+.control-hint,
+.control-hint *,
+.history-panel,
+.history-panel * {
+  user-select: none;
 }
 
 .time {

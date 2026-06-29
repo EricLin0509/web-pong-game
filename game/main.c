@@ -53,7 +53,7 @@ static void set_theme(Game *game)
         themes + game->theme_index : themes + (game->theme_index + 1) % THEME_COUNT;
 
     /* Due to the Text fields are continuous, we can set the color of all Text fields at once */
-    for (int i = 0; i < TOTAL_TEXT; i++)
+    for (int i = 0; i < NUM_TEXTS; i++)
     {
         bool is_colored = SDL_SetTextureColorMod(game->texts[i].text_texture,
             game->theme->foreground[0],
@@ -416,13 +416,13 @@ static void show_welcome_screen(Game *game)
 {
     if (game == NULL) return;
 
-    render_text_texture(game->texts, game->window_renderer,
-                         (WINDOW_WIDTH - game->texts[0].text_rect.w) / 2,
-                         (WINDOW_HEIGHT - game->texts[0].text_rect.h) / 2 - 50);
+    render_text_texture(game->texts + WELCOME_TEXT, game->window_renderer,
+                         (WINDOW_WIDTH - game->texts[WELCOME_TEXT].text_rect.w) / 2,
+                         (WINDOW_HEIGHT - game->texts[WELCOME_TEXT].text_rect.h) / 2 - 50);
 
-    render_text_texture(game->texts + 1, game->window_renderer,
-                         (WINDOW_WIDTH - game->texts[1].text_rect.w) / 2,
-                         (WINDOW_HEIGHT - game->texts[1].text_rect.h) / 2 + 50);
+    render_text_texture(game->texts + START_TEXT, game->window_renderer,
+                         (WINDOW_WIDTH - game->texts[START_TEXT].text_rect.w) / 2,
+                         (WINDOW_HEIGHT - game->texts[START_TEXT].text_rect.h) / 2 + 50);
 }
 
 static void show_middle_line(Game *game)
@@ -435,7 +435,7 @@ static void show_middle_line(Game *game)
 static void show_game_mode_screen(Game *game)
 {
     if (game == NULL) return;
-    Text *mode_text = (game->mode_flags & INFINITE_MODE_MASK) ? game->texts + 3 : game->texts + 2;
+    Text *mode_text = (game->mode_flags & INFINITE_MODE_MASK) ? game->texts + INFINITE_MODE_TEXT : game->texts + CLASSIC_MODE_TEXT;
 
     render_text_texture(mode_text, game->window_renderer,
                              20,
@@ -445,13 +445,13 @@ static void show_game_mode_screen(Game *game)
     switch (game->difficulty_index)
     {
         case DIFFICULTY_EASY:
-            difficulty_text = game->texts + 6;
+            difficulty_text = game->texts + EASY_TEXT;
             break;
         case DIFFICULTY_MEDIUM:
-            difficulty_text = game->texts + 7;
+            difficulty_text = game->texts + MEDIUM_TEXT;
             break;
         case DIFFICULTY_HARD:
-            difficulty_text = game->texts + 8;
+            difficulty_text = game->texts + HARD_TEXT;
             break;
         default:
             break;
@@ -465,7 +465,7 @@ static void show_game_mode_screen(Game *game)
 static void show_player_screen(Game *game)
 {
     if (game == NULL) return;
-    Text *player_text = (game->mode_flags & DOUBLE_PLAYER_MASK) ? game->texts + 5 : game->texts + 4;
+    Text *player_text = (game->mode_flags & DOUBLE_PLAYER_MASK) ? game->texts + DOUBLE_PLAYER_TEXT : game->texts + SINGLE_PLAYER_TEXT;
 
     render_text_texture(player_text, game->window_renderer,
                              WINDOW_WIDTH - WINDOW_BORDER_OFFSET - player_text->text_rect.w - 20,
@@ -476,9 +476,9 @@ static void show_paused_screen(Game *game)
 {
     if (game == NULL) return;
 
-    render_text_texture(game->texts + 9, game->window_renderer,
+    render_text_texture(game->texts + PAUSED_TEXT, game->window_renderer,
                              20,
-                             (WINDOW_HEIGHT - game->texts[9].text_rect.h) - 15);
+                             (WINDOW_HEIGHT - game->texts[PAUSED_TEXT].text_rect.h) - 15);
 }
 
 static void show_game_screen(Game *game)
@@ -498,22 +498,22 @@ static void show_game_over_screen(Game *game)
     float desc_pos_x = 0;
     if (game->left_score > game->right_score)
     {
-        msg_pos_x = (WINDOW_WIDTH - WINDOW_BORDER_OFFSET * 2) / 4 - (game->texts[10].text_rect.w / 2);
-        desc_pos_x = (WINDOW_WIDTH - WINDOW_BORDER_OFFSET * 2) / 4 - (game->texts[11].text_rect.w / 2);
+        msg_pos_x = (WINDOW_WIDTH - WINDOW_BORDER_OFFSET * 2) / 4 - (game->texts[GAME_OVER_TEXT].text_rect.w / 2);
+        desc_pos_x = (WINDOW_WIDTH - WINDOW_BORDER_OFFSET * 2) / 4 - (game->texts[RESTART_TEXT].text_rect.w / 2);
     }
     else
     {
-        msg_pos_x = (WINDOW_WIDTH - WINDOW_BORDER_OFFSET * 2) * 3 / 4 - (game->texts[10].text_rect.w / 2);
-        desc_pos_x = (WINDOW_WIDTH - WINDOW_BORDER_OFFSET * 2) * 3 / 4 - (game->texts[11].text_rect.w / 2);
+        msg_pos_x = (WINDOW_WIDTH - WINDOW_BORDER_OFFSET * 2) * 3 / 4 - (game->texts[GAME_OVER_TEXT].text_rect.w / 2);
+        desc_pos_x = (WINDOW_WIDTH - WINDOW_BORDER_OFFSET * 2) * 3 / 4 - (game->texts[RESTART_TEXT].text_rect.w / 2);
     }
 
-    render_text_texture(&game->texts[10], game->window_renderer,
+    render_text_texture(game->texts + GAME_OVER_TEXT, game->window_renderer,
                          msg_pos_x,
-                         (WINDOW_HEIGHT - game->texts[10].text_rect.h) / 2 - 50);
+                         (WINDOW_HEIGHT - game->texts[GAME_OVER_TEXT].text_rect.h) / 2 - 50);
 
-    render_text_texture(&game->texts[11], game->window_renderer,
+    render_text_texture(game->texts + RESTART_TEXT, game->window_renderer,
                          desc_pos_x,
-                         (WINDOW_HEIGHT - game->texts[11].text_rect.h) / 2 + 50);
+                         (WINDOW_HEIGHT - game->texts[RESTART_TEXT].text_rect.h) / 2 + 50);
 }
 
 static void render(Game *game)
@@ -714,8 +714,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     bool font_loaded = true;
 
-#define TEXT(index, str, font_size) \
-    font_loaded &= create_text_texture(game.texts + index, font_stream, str, font_size, game.window_renderer, FONT_COLOR);
+#define TEXT(id, str, font_size) \
+    font_loaded &= create_text_texture(game.texts + id, font_stream, str, font_size, game.window_renderer, FONT_COLOR);
 LIST_OF_TEXTS
 #undef TEXT
 
@@ -887,7 +887,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     if (game->snow.snow_sprite)
         SDL_DestroyTexture(game->snow.snow_sprite);
 
-    for (int i = 0; i < TOTAL_TEXT; i++)
+    for (int i = 0; i < NUM_TEXTS; i++)
         destroy_text_texture(game->texts + i);
 
     TTF_Quit();

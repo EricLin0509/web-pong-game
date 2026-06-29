@@ -12,8 +12,6 @@
 #include "snow.h"
 #include "themes.h"
 
-#define TOTAL_TEXT 12
-
 #define INFINITE_MODE_MASK 0x01
 #define DOUBLE_PLAYER_MASK 0x02
 
@@ -36,34 +34,43 @@ typedef struct {
 #endif
 
 #define CORE_TEXTS \
-    TEXT(0, "Welcome to Pong", 64) \
-    TEXT(2, "Classic Mode", 48) \
-    TEXT(3, "Infinite Mode", 48) \
-    TEXT(4, "Single Player", 48) \
-    TEXT(5, "Double Player", 48) \
-    TEXT(6, "Easy", 48) \
-    TEXT(7, "Medium", 48) \
-    TEXT(8, "Hard", 48) \
-    TEXT(9, "Paused", 64) \
-    TEXT(10, "WIN", 72)
+    TEXT(WELCOME_TEXT, "Welcome to Pong", 64) \
+    TEXT(CLASSIC_MODE_TEXT, "Classic Mode", 48) \
+    TEXT(INFINITE_MODE_TEXT, "Infinite Mode", 48) \
+    TEXT(SINGLE_PLAYER_TEXT, "Single Player", 48) \
+    TEXT(DOUBLE_PLAYER_TEXT, "Double Player", 48) \
+    TEXT(EASY_TEXT, "Easy", 48) \
+    TEXT(MEDIUM_TEXT, "Medium", 48) \
+    TEXT(HARD_TEXT, "Hard", 48) \
+    TEXT(PAUSED_TEXT, "Paused", 64) \
+    TEXT(GAME_OVER_TEXT, "WIN", 72)
 
 #ifdef __EMSCRIPTEN__
 
 #define INFO_TEXTS \
-    TEXT(1, "Press Start Button to start", 32) \
-    TEXT(11, "Press Restart Button to restart", 28)
+    TEXT(START_TEXT, "Press Start Button to start", 32) \
+    TEXT(RESTART_TEXT, "Press Restart Button to restart", 28)
 
 #else
 
 #define INFO_TEXTS \
-    TEXT(1, "Press [SPACE] to start", 32) \
-    TEXT(11, "Press [SPACE] to restart", 28)
+    TEXT(START_TEXT, "Press [SPACE] to start", 32) \
+    TEXT(RESTART_TEXT, "Press [SPACE] to restart", 28)
 
 #endif
 
 #define LIST_OF_TEXTS \
     CORE_TEXTS \
     INFO_TEXTS
+
+#define TEXT(id, str, font_size) id,
+
+typedef enum {
+    LIST_OF_TEXTS
+    NUM_TEXTS
+} TextId;
+
+#undef TEXT
 
 typedef struct {
     SDL_Window *window;
@@ -78,7 +85,7 @@ typedef struct {
 
     Snow snow;
 
-    Text texts[TOTAL_TEXT]; // This include all the texts in LIST_OF_TEXTS
+    Text texts[NUM_TEXTS]; // This include all the texts in LIST_OF_TEXTS
 
     Uint8 mode_flags; // Flags for the game mode
 

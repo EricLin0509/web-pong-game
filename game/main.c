@@ -938,28 +938,40 @@ EMSCRIPTEN_KEEPALIVE
 void toggle_theme(void)
 {
     if (game_ptr && game_ptr->state == GAME_INIT)
+    {
+        reset_idle_timer(game_ptr);
         set_theme(game_ptr);
+    }
 }
 
 EMSCRIPTEN_KEEPALIVE
 void toggle_game_mode(void)
 {
     if (game_ptr && game_ptr->state == GAME_INIT)
+    {
+        reset_idle_timer(game_ptr);
         switch_game_mode(game_ptr);
+    }
 }
 
 EMSCRIPTEN_KEEPALIVE
 void toggle_player(void)
 {
     if (game_ptr && game_ptr->state == GAME_INIT)
+    {
+        reset_idle_timer(game_ptr);
         switch_game_player(game_ptr);
+    }
 }
 
 EMSCRIPTEN_KEEPALIVE
 void toggle_difficulty(void)
 {
     if (game_ptr && game_ptr->state == GAME_INIT)
+    {
+        reset_idle_timer(game_ptr);
         switch_difficulty(game_ptr);
+    }
 }
 
 
@@ -970,6 +982,7 @@ void set_snowflake_count(int count)
 
     increase_snow_count(&game_ptr->snow, count - game_ptr->snow.snowflake_count, WINDOW_WIDTH, WINDOW_HEIGHT);
     notify_snow_count_change();
+    reset_idle_timer(game_ptr);
 }
 
 EMSCRIPTEN_KEEPALIVE

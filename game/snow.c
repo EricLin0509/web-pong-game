@@ -120,7 +120,7 @@ static void init_snowflake_inc(Snowflake *snowflake, int start_idx, int end_idx,
     if (snowflake == NULL
         || start_idx >= end_idx) return;
 
-    while (start_idx < end_idx)
+    while (start_idx <= end_idx)
     {
         init_snowflake(snowflake, start_idx, w, h);
         start_idx++;

@@ -33,13 +33,14 @@ void scheduler_destroy(Scheduler **scheduler)
 }
 
 void scheduler_add_task(Scheduler *scheduler, Uint64 relative_time,
-                      void (*callback)(void *arg), bool (*cancel_checker)(const Task *task), 
+                      void (*callback)(void *arg), 
+					  bool (*cancel_checker)(const Task *task), void (*cancel_callback)(void *user_data),
                       void (*destroyer)(void *user_data), void *user_data)
 {
     if (!scheduler || !callback) return;
 
     Uint64 trigger_time = relative_time + SDL_GetTicks() + 1; // Calculate the absolute trigger time
-    scheduler->task_queue.push(Task{trigger_time, callback, cancel_checker, destroyer, user_data});
+    scheduler->task_queue.push(Task{trigger_time, callback, cancel_checker, cancel_callback, destroyer, user_data});
 }
 
 void scheduler_clear_tasks(Scheduler *scheduler)
@@ -67,13 +68,12 @@ void scheduler_process_tasks(Scheduler *scheduler)
 
         if (should_cancel)
         {
-            run_destroyer(curr_task); // Destroy the user data if the destroyer exists
-            continue; // Skip the callback if the task should be canceled
+            if (curr_task.cancel_callback)
+                curr_task.cancel_callback(curr_task.user_data); // Execute the cancel callback function
+            continue;
         }
 
         if (curr_task.callback)
             curr_task.callback(curr_task.user_data); // Execute the callback function
-
-        run_destroyer(curr_task); // Destroy the user data if the destroyer exists
     }
 }

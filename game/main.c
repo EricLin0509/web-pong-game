@@ -23,10 +23,6 @@
 #define CLASSIC_WIN_SCORE 11
 #define INFINITE_WIN_SCORE SIZE_MAX // Use SIZE_MAX to represent infinity
 
-#ifndef BENCHMARK_MODE
-#define IDLE_TIMEOUT_MS 2000 // 2 seconds idle timeout
-#endif
-
 #ifdef __EMSCRIPTEN__
 static Game *game_ptr = NULL; // Expose the game struct to WebAssembly
 
@@ -45,6 +41,21 @@ void store_score_history(void);
 /* Idle Functions */
 #ifndef BENCHMARK_MODE
 
+static void init_idle_timer(Game *game)
+{
+    if (game == NULL) return;
+
+    game->idle_token = game->last_idle_token = 0;
+
+    scheduler_add_task(game->scheduler,
+                    IDLE_TIMEOUT_MS,
+                    idle_timeout,
+                    idle_timeout_cancel,
+                    idle_timeout_cancel_callback,
+                    NULL,
+                    game);
+}
+
 /* Stop rendering when timeout to save energy */
 static void reset_idle_timer(Game *game)
 {
@@ -52,17 +63,6 @@ static void reset_idle_timer(Game *game)
 
     game->idle_token++;
     game->mode_flags &= ~IDLE_MASK; // Clear the idle flag
-
-    IdleTaskData *data = calloc(1, sizeof(IdleTaskData));
-    data->game = game;
-    data->token = game->idle_token;
-
-    scheduler_add_task(game->scheduler,
-                    IDLE_TIMEOUT_MS,
-                    idle_timeout,
-                    idle_timeout_cancel,
-                    free,
-                    data);
 }
 
 #endif
@@ -151,7 +151,7 @@ static void game_reset(Game *game)
     reset_paddle(&game->right_paddle);
 
     scheduler_clear_tasks(game->scheduler); // Clear all remaining tasks in the scheduler
-    reset_idle_timer(game); // Reset the idle timer
+    init_idle_timer(game); // Reset the idle timer
 
 #if defined(__EMSCRIPTEN__) && !defined(BENCHMARK_MODE)
     notify_score_points();
@@ -293,7 +293,7 @@ static void double_tap_actions(Game *game)
             game->state = GAME_PAUSED;
             break;
         case GAME_PAUSED:
-            scheduler_add_task(game->scheduler, 0, game_resuming, NULL, NULL, game);
+            scheduler_add_task(game->scheduler, 0, game_resuming, NULL, NULL, NULL, game);
             break;
         case GAME_OVER:
             game_reset(game);
@@ -351,7 +351,7 @@ static void handle_space_key(Game *game)
             game->state = GAME_PAUSED;
             break;
         case GAME_PAUSED:
-            scheduler_add_task(game->scheduler, 0, game_resuming, NULL, NULL, game);
+            scheduler_add_task(game->scheduler, 0, game_resuming, NULL, NULL, NULL, game);
             break;
         case GAME_OVER:
             game_reset(game);
@@ -754,7 +754,7 @@ LIST_OF_TEXTS
     game.state = GAME_INIT;
 
 #ifndef BENCHMARK_MODE
-    reset_idle_timer(&game);
+    init_idle_timer(&game);
 #endif
     return SDL_APP_CONTINUE;
 }
@@ -912,7 +912,7 @@ void resume_game(void)
 
     if (game_ptr->state != GAME_PAUSED) return;
 
-    scheduler_add_task(game_ptr->scheduler, 0, game_resuming, NULL, NULL, game_ptr);
+    scheduler_add_task(game_ptr->scheduler, 0, game_resuming, NULL, NULL, NULL, game_ptr);
 }
 
 EMSCRIPTEN_KEEPALIVE

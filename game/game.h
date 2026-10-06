@@ -13,6 +13,10 @@
 #include "snow.h"
 #include "themes.h"
 
+#ifndef BENCHMARK_MODE
+#define IDLE_TIMEOUT_MS 2000 // 2 seconds idle timeout
+#endif
+
 #define INFINITE_MODE_MASK 0x01
 #define DOUBLE_PLAYER_MASK 0x02
 #define IDLE_MASK 0x08
@@ -113,6 +117,7 @@ typedef struct {
 
 #ifndef BENCHMARK_MODE
     Uint64 idle_token;
+    Uint64 last_idle_token;
 #endif
 } Game;
 
